@@ -1,0 +1,307 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>Go Slices: usage and internals &#8212; Go database/sql tutorial  ドキュメント</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="検索" href="search.html" />
+    <link rel="next" title="Go Concurrency Patterns: Context" href="context.html" />
+    <link rel="prev" title="The Go Blog" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <a href="https://github.com/d-tsuji/go-introduction-book"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><div class="section" id="go-slices-usage-and-internals">
+<h1>Go Slices: usage and internals<a class="headerlink" href="#go-slices-usage-and-internals" title="このヘッドラインへのパーマリンク">¶</a></h1>
+<p>Goのslice型は型付けされたデータの配列を操作する便利で効率的な方法を提供します。スライスは他の言語でいうところの配列に似ていますが、いくつかの特徴があります。本記事ではスライスの概要と使用方法を説明します。</p>
+<div class="section" id="id1">
+<h2>配列<a class="headerlink" href="#id1" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>slice型はGoの配列型の上に構築されている抽象化であるため、スライスを理解するためには、まず配列を理解する必要があります。</p>
+<p>配列型の定義は、配列の長さと要素の型を指定します。例えば、型 <code class="docutils literal notranslate"><span class="pre">[4]int</span></code> は4つの整数を格納する配列を表します。配列のサイズは固定されています。その長さはその型の一部です( <code class="docutils literal notranslate"><span class="pre">[4]int</span></code> と <code class="docutils literal notranslate"><span class="pre">[5]int</span></code> は別の型です)。配列には通常の方法でインデックスを付けることができるため、式 <code class="docutils literal notranslate"><span class="pre">s[n]</span></code> は0から始まる <em>n</em> 番目の要素にアクセスします。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">a</span> <span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="kt">int</span>
+<span class="nx">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">=</span> <span class="mi">1</span>
+<span class="nx">i</span> <span class="o">:=</span> <span class="nx">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="c1">// i == 1</span>
+</pre></div>
+</div>
+<p>配列は明示的に初期化をする必要がありません。配列のゼロ値は、要素自体がゼロ値で初期化されているすぐに使用できる配列です。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// a[2] == 0, the zero value of the int type</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">[4]int</span></code> のメモリ上での表現は、連続して配置された4つの整数値です。</p>
+<img alt="_images/go-slices-usage-and-internals_slice-array.png" src="_images/go-slices-usage-and-internals_slice-array.png" />
+<p>Goの配列は値です。配列の変数は、配列全体を示します。(Cの場合のように)配列の最初の要素へのポインタではありません。これは、配列の値を割り当てたり、関数に渡したりすると、その内容のコピーが作成されることを意味します。(コピーを回避するために、配列への <em>ポインタ</em> を渡すことができますが、それは配列ではなく配列へのポインタです。)配列について考える1つの方法は、固定サイズの複合値のような名前付きフィールドではなく、インデックス付きフィールドのような構造です。</p>
+<p>配列のリテラルは次のように指定できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span> <span class="o">:=</span> <span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;Penn&quot;</span><span class="p">,</span> <span class="s">&quot;Teller&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>または、コンパイラに配列の要素をカウントさせることができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span> <span class="o">:=</span> <span class="p">[</span><span class="o">...</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;Penn&quot;</span><span class="p">,</span> <span class="s">&quot;Teller&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>いずれの場合も <code class="docutils literal notranslate"><span class="pre">b</span></code> の型は <code class="docutils literal notranslate"><span class="pre">[2]string</span></code> です。</p>
+</div>
+<div class="section" id="id2">
+<h2>スライス<a class="headerlink" href="#id2" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>配列はGoに含まれていますが、少し柔軟性に欠けるため、Goのコードではあまり頻繁に表れません。ただし、スライスはよく見かけます。配列上に構築され、優れた力と利便性を提供します。</p>
+<p>スライスの型指定は <code class="docutils literal notranslate"><span class="pre">[]T</span></code> です。<code class="docutils literal notranslate"><span class="pre">T</span></code> はスライスの要素の型です。配列型とは異なり、スライス型には長さが指定されていません。</p>
+<p>スライスのリテラルは、要素の数を省略したことを除いて、配列のリテラルと同様に宣言されます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">letters</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="s">&quot;c&quot;</span><span class="p">,</span> <span class="s">&quot;d&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>スライスは <code class="docutils literal notranslate"><span class="pre">make</span></code> という組み込み関数を使用して作成できます。これには以下のようなシグネチャがあります。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nb">make</span><span class="p">([]</span><span class="nx">T</span><span class="p">,</span> <span class="nx">len</span><span class="p">,</span> <span class="nx">cap</span><span class="p">)</span> <span class="p">[]</span><span class="nx">T</span>
+</pre></div>
+</div>
+<p>Tは、作成するスライスの要素の型です。<code class="docutils literal notranslate"><span class="pre">make</span></code> 関数は、型、長さ、およびオプションの容量を取ります。呼び出されると、<code class="docutils literal notranslate"><span class="pre">make</span></code> は配列を割り当て、その配列を参照するスライスを返します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">s</span> <span class="p">[]</span><span class="kt">byte</span>
+<span class="nx">s</span> <span class="p">=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="c1">// s == []byte{0, 0, 0, 0, 0}</span>
+</pre></div>
+</div>
+<p>容量の引数を省略すると、デフォルトで長さの引数と同じになります。上記と同じコードでより簡潔なバージョンを次に示します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">s</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>組み込みの <code class="docutils literal notranslate"><span class="pre">len</span></code> および <code class="docutils literal notranslate"><span class="pre">cap</span></code> 関数を使用して、スライスの長さと容量を調べることができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span> <span class="o">==</span> <span class="mi">5</span>
+<span class="nb">cap</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span> <span class="o">==</span> <span class="mi">5</span>
+</pre></div>
+</div>
+<p>次の2つのセクションでは、長さと容量の関係について説明します。</p>
+<p>スライスのゼロ値は <code class="docutils literal notranslate"><span class="pre">nil</span></code> です。<code class="docutils literal notranslate"><span class="pre">len</span></code> や <code class="docutils literal notranslate"><span class="pre">cap</span></code> 関数はnilスライスとして0を返します。</p>
+<p>スライスは、既存のスライスまたは配列を「スライス」することでも作ることができます。スライスは、コロンで区切られた2つのインデックスで半開区間を指定することによって作成されます。例えば、<code class="docutils literal notranslate"><span class="pre">b[1：4]</span></code> は、<code class="docutils literal notranslate"><span class="pre">b</span></code> の1から3のインデックスの要素を含むスライスを作成します(結果のスライスのインデックスは0～2になります)。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">{</span><span class="sc">&#39;g&#39;</span><span class="p">,</span> <span class="sc">&#39;o&#39;</span><span class="p">,</span> <span class="sc">&#39;l&#39;</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;n&#39;</span><span class="p">,</span> <span class="sc">&#39;g&#39;</span><span class="p">}</span>
+<span class="c1">// b[1:4] == []byte{&#39;o&#39;, &#39;l&#39;, &#39;a&#39;}, sharing the same storage as b</span>
+</pre></div>
+</div>
+<p>スライス式の開始インデックスと終了インデックスはオプションです。デフォルトはそれぞれゼロとスライスの長さです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// b[:2] == []byte{&#39;g&#39;, &#39;o&#39;}</span>
+<span class="c1">// b[2:] == []byte{&#39;l&#39;, &#39;a&#39;, &#39;n&#39;, &#39;g&#39;}</span>
+<span class="c1">// b[:] == b</span>
+</pre></div>
+</div>
+<p>以下は与えられた配列からスライスを作成する構文の一つです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">x</span> <span class="o">:=</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;Лайка&quot;</span><span class="p">,</span> <span class="s">&quot;Белка&quot;</span><span class="p">,</span> <span class="s">&quot;Стрелка&quot;</span><span class="p">}</span>
+<span class="nx">s</span> <span class="o">:=</span> <span class="nx">x</span><span class="p">[:]</span> <span class="c1">// a slice referencing the storage of x</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id3">
+<h2>スライスの内部構造<a class="headerlink" href="#id3" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>スライスは、配列セグメントの記述子です。これは、配列へのポインター、セグメントの長さ、およびその容量(セグメントの最大長)で構成されています。</p>
+<div class="admonition-todo admonition" id="id4">
+<p class="admonition-title">課題</p>
+<p>どのように訳すと自然か。</p>
+<p>A slice is a descriptor of an array segment. It consists of a pointer to
+the array, the length of the segment, and its capacity (the maximum
+length of the segment).</p>
+</div>
+<img alt="_images/go-slices-usage-and-internals_slice-struct.png" src="_images/go-slices-usage-and-internals_slice-struct.png" />
+<p>変数 <code class="docutils literal notranslate"><span class="pre">s</span></code> はまず <code class="docutils literal notranslate"><span class="pre">make([]byte,</span> <span class="pre">5)</span></code> によって作成され、以下のような構造になっています。</p>
+<img alt="_images/go-slices-usage-and-internals_slice-1.png" src="_images/go-slices-usage-and-internals_slice-1.png" />
+<p>長さは、スライスによって参照される要素の数です。容量は、基になる配列内の要素の数です(スライスポインターによって参照される要素から始まります)。次のいくつかの例を見ていくと、長さと容量の違いが明確になります。</p>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p>重要なポイント</p>
+<ul class="simple">
+<li><p>長さは、スライスによって参照される要素の数</p></li>
+<li><p>容量は、基になる配列内の要素の数</p></li>
+</ul>
+</div>
+<p>次のように <code class="docutils literal notranslate"><span class="pre">s</span></code> をスライスするとき、スライスのデータ構造の変化と、基になる配列との関係を観察します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">s</span> <span class="p">=</span> <span class="nx">s</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span>
+</pre></div>
+</div>
+<img alt="_images/go-slices-usage-and-internals_slice-2.png" src="_images/go-slices-usage-and-internals_slice-2.png" />
+<p>スライスは、スライスのデータをコピーしません。元の配列を指す新しいスライス値を作成します。これにより、配列インデックスを操作するのと同じくらい効率的にスライス操作ができます。したがって、再スライスの <em>要素</em> (スライス自体ではない)を変更すると、元のスライスの要素が変更されます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">d</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">{</span><span class="sc">&#39;r&#39;</span><span class="p">,</span> <span class="sc">&#39;o&#39;</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;d&#39;</span><span class="p">}</span>
+<span class="nx">e</span> <span class="o">:=</span> <span class="nx">d</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+<span class="c1">// e == []byte{&#39;a&#39;, &#39;d&#39;}</span>
+<span class="nx">e</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="p">=</span> <span class="sc">&#39;m&#39;</span>
+<span class="c1">// e == []byte{&#39;a&#39;, &#39;m&#39;}</span>
+<span class="c1">// d == []byte{&#39;r&#39;, &#39;o&#39;, &#39;a&#39;, &#39;m&#39;}</span>
+</pre></div>
+</div>
+<p>先に <code class="docutils literal notranslate"><span class="pre">s</span></code> をその容量よりも短い長さにスライスしました。再びスライスすることで、容量を増やすことができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">s</span> <span class="p">=</span> <span class="nx">s</span><span class="p">[:</span><span class="nb">cap</span><span class="p">(</span><span class="nx">s</span><span class="p">)]</span>
+</pre></div>
+</div>
+<img alt="_images/go-slices-usage-and-internals_slice-3.png" src="_images/go-slices-usage-and-internals_slice-3.png" />
+<p>スライスは容量を超えて増やすことはできません。スライスまたは配列の境界外でインデックスを作成するときと同様に、そうしようとすると、実行時パニックが発生します。同様に、配列内の以前の要素にアクセスするために、スライスを0未満にスライスすることはできません。</p>
+</div>
+<div class="section" id="append">
+<h2>スライスの拡張(コピーと <code class="docutils literal notranslate"><span class="pre">append</span></code> 関数)<a class="headerlink" href="#append" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>To increase the capacity of a slice one must create a new, larger slice
+and copy the contents of the original slice into it. This technique is
+how dynamic array implementations from other languages work behind the
+scenes. The next example doubles the capacity of <code class="docutils literal notranslate"><span class="pre">s</span></code> by making a new
+slice, <code class="docutils literal notranslate"><span class="pre">t</span></code>, copying the contents of <code class="docutils literal notranslate"><span class="pre">s</span></code> into <code class="docutils literal notranslate"><span class="pre">t</span></code>, and then
+assigning the slice value <code class="docutils literal notranslate"><span class="pre">t</span></code> to <code class="docutils literal notranslate"><span class="pre">s</span></code>:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">t</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">),</span> <span class="p">(</span><span class="nb">cap</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span> <span class="c1">// +1 in case cap(s) == 0</span>
+<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">s</span> <span class="p">{</span>
+        <span class="nx">t</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">s</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
+<span class="p">}</span>
+<span class="nx">s</span> <span class="p">=</span> <span class="nx">t</span>
+</pre></div>
+</div>
+<p>The looping piece of this common operation is made easier by the
+built-in copy function. As the name suggests, copy copies data from a
+source slice to a destination slice. It returns the number of elements
+copied.</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nb">copy</span><span class="p">(</span><span class="nx">dst</span><span class="p">,</span> <span class="nx">src</span> <span class="p">[]</span><span class="nx">T</span><span class="p">)</span> <span class="kt">int</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">copy</span></code> function supports copying between slices of different
+lengths (it will copy only up to the smaller number of elements). In
+addition, <code class="docutils literal notranslate"><span class="pre">copy</span></code> can handle source and destination slices that share
+the same underlying array, handling overlapping slices correctly.</p>
+<p>Using <code class="docutils literal notranslate"><span class="pre">copy</span></code>, we can simplify the code snippet above:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">t</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">),</span> <span class="p">(</span><span class="nb">cap</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">copy</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span>
+<span class="nx">s</span> <span class="p">=</span> <span class="nx">t</span>
+</pre></div>
+</div>
+<p>A common operation is to append data to the end of a slice. This
+function appends byte elements to a slice of bytes, growing the slice if
+necessary, and returns the updated slice value:</p>
+<p>{{code &quot;/doc/progs/slices.go&quot; `/AppendByte/` `/STOP/<a href="#id5"><span class="problematic" id="id6">`</span></a>}}</p>
+<p>One could use <code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> like this:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">p</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">}</span>
+<span class="nx">p</span> <span class="p">=</span> <span class="nx">AppendByte</span><span class="p">(</span><span class="nx">p</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
+<span class="c1">// p == []byte{2, 3, 5, 7, 11, 13}</span>
+</pre></div>
+</div>
+<p>Functions like <code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> are useful because they offer complete
+control over the way the slice is grown. Depending on the
+characteristics of the program, it may be desirable to allocate in
+smaller or larger chunks, or to put a ceiling on the size of a
+reallocation.</p>
+<p>But most programs don't need complete control, so Go provides a built-in
+<code class="docutils literal notranslate"><span class="pre">append</span></code> function that's good for most purposes; it has the signature</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nb">append</span><span class="p">(</span><span class="nx">s</span> <span class="p">[]</span><span class="nx">T</span><span class="p">,</span> <span class="nx">x</span> <span class="o">...</span><span class="nx">T</span><span class="p">)</span> <span class="p">[]</span><span class="nx">T</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">append</span></code> function appends the elements <code class="docutils literal notranslate"><span class="pre">x</span></code> to the end of the
+slice <code class="docutils literal notranslate"><span class="pre">s</span></code>, and grows the slice if a greater capacity is needed.</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">a</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="c1">// a == []int{0}</span>
+<span class="nx">a</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="c1">// a == []int{0, 1, 2, 3}</span>
+</pre></div>
+</div>
+<p>To append one slice to another, use <code class="docutils literal notranslate"><span class="pre">...</span></code> to expand the second
+argument to a list of arguments.</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">a</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;John&quot;</span><span class="p">,</span> <span class="s">&quot;Paul&quot;</span><span class="p">}</span>
+<span class="nx">b</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;George&quot;</span><span class="p">,</span> <span class="s">&quot;Ringo&quot;</span><span class="p">,</span> <span class="s">&quot;Pete&quot;</span><span class="p">}</span>
+<span class="nx">a</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span><span class="o">...</span><span class="p">)</span> <span class="c1">// equivalent to &quot;append(a, b[0], b[1], b[2])&quot;</span>
+<span class="c1">// a == []string{&quot;John&quot;, &quot;Paul&quot;, &quot;George&quot;, &quot;Ringo&quot;, &quot;Pete&quot;}</span>
+</pre></div>
+</div>
+<p>Since the zero value of a slice (<code class="docutils literal notranslate"><span class="pre">nil</span></code>) acts like a zero-length slice,
+you can declare a slice variable and then append to it in a loop:</p>
+<p>{{code &quot;/doc/progs/slices.go&quot; `/Filter/` `/STOP/<a href="#id7"><span class="problematic" id="id8">`</span></a>}}</p>
+</div>
+<div class="section" id="a-possible-gotcha">
+<h2><strong>A possible &quot;gotcha&quot;</strong><a class="headerlink" href="#a-possible-gotcha" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>As mentioned earlier, re-slicing a slice doesn't make a copy of the
+underlying array. The full array will be kept in memory until it is no
+longer referenced. Occasionally this can cause the program to hold all
+the data in memory when only a small piece of it is needed.</p>
+<p>For example, this <code class="docutils literal notranslate"><span class="pre">FindDigits</span></code> function loads a file into memory and
+searches it for the first group of consecutive numeric digits, returning
+them as a new slice.</p>
+<p>{{code &quot;/doc/progs/slices.go&quot; `/digit/` `/STOP/<a href="#id9"><span class="problematic" id="id10">`</span></a>}}</p>
+<p>This code behaves as advertised, but the returned <code class="docutils literal notranslate"><span class="pre">[]byte</span></code> points into
+an array containing the entire file. Since the slice references the
+original array, as long as the slice is kept around the garbage
+collector can't release the array; the few useful bytes of the file keep
+the entire contents in memory.</p>
+<p>To fix this problem one can copy the interesting data to a new slice
+before returning it:</p>
+<p>{{code &quot;/doc/progs/slices.go&quot; `/CopyDigits/` `/STOP/<a href="#id11"><span class="problematic" id="id12">`</span></a>}}</p>
+<p>A more concise version of this function could be constructed by using
+<code class="docutils literal notranslate"><span class="pre">append</span></code>. This is left as an exercise for the reader.</p>
+</div>
+<div class="section" id="further-reading">
+<h2><strong>Further Reading</strong><a class="headerlink" href="#further-reading" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p><a class="reference external" href="/doc/effective_go.html">Effective Go</a> contains an in-depth treatment
+of <a class="reference external" href="/doc/effective_go.html#slices">slices</a> and
+<a class="reference external" href="/doc/effective_go.html#arrays">arrays</a>, and the Go <a class="reference external" href="/doc/go_spec.html">language
+specification</a> defines
+<a class="reference external" href="/doc/go_spec.html#Slice_types">slices</a> and their
+<a class="reference external" href="/doc/go_spec.html#Length_and_capacity">associated</a>
+<a class="reference external" href="/doc/go_spec.html#Making_slices_maps_and_channels">helper</a>
+<a class="reference external" href="/doc/go_spec.html#Appending_and_copying_slices">functions</a>.</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div id="toc" class="sidebarRow">
+    <h5><a href="index.html">The Go Blog</a></h5>
+    <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Go Slices: usage and internals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="context.html">Go Concurrency Patterns: Context</a></li>
+</ul>
+
+    
+</div>
+
+<style type="text/css">
+    .toctree-l1 {
+        font-size: 12px;
+        margin-bottom: 0;
+        font-stretch: normal;
+        font-style: normal;
+        line-height: 1.33;
+        padding-bottom: 5px;
+        margin: 2px;
+    }
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;VividCortex (translated by @d-tsuji).
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/slices_usage_and_internals.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
