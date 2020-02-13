@@ -154,12 +154,7 @@ length of the segment).</p>
 </div>
 <div class="section" id="append">
 <h2>スライスの拡張(コピーと <code class="docutils literal notranslate"><span class="pre">append</span></code> 関数)<a class="headerlink" href="#append" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>To increase the capacity of a slice one must create a new, larger slice
-and copy the contents of the original slice into it. This technique is
-how dynamic array implementations from other languages work behind the
-scenes. The next example doubles the capacity of <code class="docutils literal notranslate"><span class="pre">s</span></code> by making a new
-slice, <code class="docutils literal notranslate"><span class="pre">t</span></code>, copying the contents of <code class="docutils literal notranslate"><span class="pre">s</span></code> into <code class="docutils literal notranslate"><span class="pre">t</span></code>, and then
-assigning the slice value <code class="docutils literal notranslate"><span class="pre">t</span></code> to <code class="docutils literal notranslate"><span class="pre">s</span></code>:</p>
+<p>スライスの容量を増やすには、新しい大きなスライスを作成し、元のスライスの内容をそこにコピーする必要があります。内部的には、他言語の動的な配列実装のテクニックを用いています。次の例では、新しいスライス <code class="docutils literal notranslate"><span class="pre">t</span></code> を作成し、<code class="docutils literal notranslate"><span class="pre">s</span> <span class="pre">``の内容を</span> <span class="pre">``t</span></code> にコピーし、スライス値 <code class="docutils literal notranslate"><span class="pre">t</span></code> を <code class="docutils literal notranslate"><span class="pre">s</span></code> に割り当てることにより、<code class="docutils literal notranslate"><span class="pre">s</span></code> の容量を2倍にします。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">t</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">),</span> <span class="p">(</span><span class="nb">cap</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span> <span class="c1">// +1 in case cap(s) == 0</span>
 <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">s</span> <span class="p">{</span>
         <span class="nx">t</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">s</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
@@ -167,94 +162,119 @@ assigning the slice value <code class="docutils literal notranslate"><span class
 <span class="nx">s</span> <span class="p">=</span> <span class="nx">t</span>
 </pre></div>
 </div>
-<p>The looping piece of this common operation is made easier by the
-built-in copy function. As the name suggests, copy copies data from a
-source slice to a destination slice. It returns the number of elements
-copied.</p>
+<p>ループの中の上記のよく見る操作は、組み込みの <code class="docutils literal notranslate"><span class="pre">copy</span></code> 関数によって簡単になります。名前が示すように、<code class="docutils literal notranslate"><span class="pre">copy</span></code> は元のスライスから宛先のスライスにデータをコピーします。コピーされた要素の数を返します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nb">copy</span><span class="p">(</span><span class="nx">dst</span><span class="p">,</span> <span class="nx">src</span> <span class="p">[]</span><span class="nx">T</span><span class="p">)</span> <span class="kt">int</span>
 </pre></div>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">copy</span></code> function supports copying between slices of different
-lengths (it will copy only up to the smaller number of elements). In
-addition, <code class="docutils literal notranslate"><span class="pre">copy</span></code> can handle source and destination slices that share
-the same underlying array, handling overlapping slices correctly.</p>
-<p>Using <code class="docutils literal notranslate"><span class="pre">copy</span></code>, we can simplify the code snippet above:</p>
+<p><code class="docutils literal notranslate"><span class="pre">copy</span></code> 関数は、異なる長さのスライス間のコピーをサポートします(要素の数が少ない場合のみコピーします)。さらに <code class="docutils literal notranslate"><span class="pre">copy</span></code> は基となる配列を共有する、元のスライスと宛先のスライスを扱うことができます。重複するスライスを正しく処理できます。</p>
+<p><code class="docutils literal notranslate"><span class="pre">copy</span></code> を使うことで、上記のコードスニペットは以下のようにシンプルになります。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">t</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">),</span> <span class="p">(</span><span class="nb">cap</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span>
 <span class="nb">copy</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span>
 <span class="nx">s</span> <span class="p">=</span> <span class="nx">t</span>
 </pre></div>
 </div>
-<p>A common operation is to append data to the end of a slice. This
-function appends byte elements to a slice of bytes, growing the slice if
-necessary, and returns the updated slice value:</p>
-<p>{{code &quot;/doc/progs/slices.go&quot; `/AppendByte/` `/STOP/<a href="#id5"><span class="problematic" id="id6">`</span></a>}}</p>
-<p>One could use <code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> like this:</p>
+<p>よく使われる操作は、スライスの最後にデータを追加することです。以下の関数は、バイトのスライスにバイト要素を追加し、必要に応じてスライスを拡大し、更新されたスライス値を返します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">AppendByte</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">data</span> <span class="o">...</span><span class="kt">byte</span><span class="p">)</span> <span class="p">[]</span><span class="kt">byte</span> <span class="p">{</span>
+   <span class="nx">m</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+   <span class="nx">n</span> <span class="o">:=</span> <span class="nx">m</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="nx">data</span><span class="p">)</span>
+   <span class="k">if</span> <span class="nx">n</span> <span class="p">&gt;</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span> <span class="p">{</span> <span class="c1">// if necessary, reallocate</span>
+      <span class="c1">// allocate double what&#39;s needed, for future growth.</span>
+      <span class="nx">newSlice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="p">(</span><span class="nx">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span>
+      <span class="nb">copy</span><span class="p">(</span><span class="nx">newSlice</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+      <span class="nx">slice</span> <span class="p">=</span> <span class="nx">newSlice</span>
+   <span class="p">}</span>
+   <span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="nx">n</span><span class="p">]</span>
+   <span class="nb">copy</span><span class="p">(</span><span class="nx">slice</span><span class="p">[</span><span class="nx">m</span><span class="p">:</span><span class="nx">n</span><span class="p">],</span> <span class="nx">data</span><span class="p">)</span>
+   <span class="k">return</span> <span class="nx">slice</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> は使用例は以下です。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">p</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">}</span>
 <span class="nx">p</span> <span class="p">=</span> <span class="nx">AppendByte</span><span class="p">(</span><span class="nx">p</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
 <span class="c1">// p == []byte{2, 3, 5, 7, 11, 13}</span>
 </pre></div>
 </div>
-<p>Functions like <code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> are useful because they offer complete
-control over the way the slice is grown. Depending on the
-characteristics of the program, it may be desirable to allocate in
-smaller or larger chunks, or to put a ceiling on the size of a
-reallocation.</p>
-<p>But most programs don't need complete control, so Go provides a built-in
-<code class="docutils literal notranslate"><span class="pre">append</span></code> function that's good for most purposes; it has the signature</p>
+<p><code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> などの関数は、スライスの成長方法を完全に制御できるため便利です。プログラムの特性に応じて、小さいチャンクまたは大きいチャンクに割り当てるか、再割り当てのサイズに上限を設けることが望ましい場合があります。</p>
+<div class="admonition-todo admonition" id="id5">
+<p class="admonition-title">課題</p>
+<p>slice の grown は成長と訳すのがいいのかどうか。</p>
+<p><code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> などの関数は、スライスの成長方法を完全に制御できるため便利です。</p>
+<p>Functions like <code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> are useful because they offer complete control over the way the slice is grown.</p>
+</div>
+<p>しかし、ほとんどのプログラムは完全な制御を必要としないため、Goはたいていの目的に適した組み込みの <code class="docutils literal notranslate"><span class="pre">append</span></code> 関数を提供します。以下のようなシグネチャです。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nb">append</span><span class="p">(</span><span class="nx">s</span> <span class="p">[]</span><span class="nx">T</span><span class="p">,</span> <span class="nx">x</span> <span class="o">...</span><span class="nx">T</span><span class="p">)</span> <span class="p">[]</span><span class="nx">T</span>
 </pre></div>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">append</span></code> function appends the elements <code class="docutils literal notranslate"><span class="pre">x</span></code> to the end of the
-slice <code class="docutils literal notranslate"><span class="pre">s</span></code>, and grows the slice if a greater capacity is needed.</p>
+<p><code class="docutils literal notranslate"><span class="pre">append</span></code> 関数はスライス <code class="docutils literal notranslate"><span class="pre">s</span></code> の最後に要素 <code class="docutils literal notranslate"><span class="pre">x</span></code> を追加し、容量を大きくする必要があればスライスを拡張します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">a</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 <span class="c1">// a == []int{0}</span>
 <span class="nx">a</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
 <span class="c1">// a == []int{0, 1, 2, 3}</span>
 </pre></div>
 </div>
-<p>To append one slice to another, use <code class="docutils literal notranslate"><span class="pre">...</span></code> to expand the second
-argument to a list of arguments.</p>
+<p>スライスを別のスライスに追加するには <a href="#id6"><span class="problematic" id="id7">``</span></a>...` を用いて、2番目の引数に、リストの引数を渡します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">a</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;John&quot;</span><span class="p">,</span> <span class="s">&quot;Paul&quot;</span><span class="p">}</span>
 <span class="nx">b</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;George&quot;</span><span class="p">,</span> <span class="s">&quot;Ringo&quot;</span><span class="p">,</span> <span class="s">&quot;Pete&quot;</span><span class="p">}</span>
 <span class="nx">a</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span><span class="o">...</span><span class="p">)</span> <span class="c1">// equivalent to &quot;append(a, b[0], b[1], b[2])&quot;</span>
 <span class="c1">// a == []string{&quot;John&quot;, &quot;Paul&quot;, &quot;George&quot;, &quot;Ringo&quot;, &quot;Pete&quot;}</span>
 </pre></div>
 </div>
-<p>Since the zero value of a slice (<code class="docutils literal notranslate"><span class="pre">nil</span></code>) acts like a zero-length slice,
-you can declare a slice variable and then append to it in a loop:</p>
-<p>{{code &quot;/doc/progs/slices.go&quot; `/Filter/` `/STOP/<a href="#id7"><span class="problematic" id="id8">`</span></a>}}</p>
+<p>スライスのゼロ値(nil)は長さ0のスライスのように機能するため、スライス変数を宣言してループに追加できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Filter returns a new slice holding only</span>
+<span class="c1">// the elements of s that satisfy fn()</span>
+<span class="kd">func</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">s</span> <span class="p">[]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">fn</span> <span class="kd">func</span><span class="p">(</span><span class="kt">int</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">[]</span><span class="kt">int</span> <span class="p">{</span>
+   <span class="kd">var</span> <span class="nx">p</span> <span class="p">[]</span><span class="kt">int</span> <span class="c1">// == nil</span>
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">s</span> <span class="p">{</span>
+      <span class="k">if</span> <span class="nx">fn</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nx">p</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">p</span><span class="p">,</span> <span class="nx">v</span><span class="p">)</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+   <span class="k">return</span> <span class="nx">p</span>
+<span class="p">}</span>
+</pre></div>
 </div>
-<div class="section" id="a-possible-gotcha">
-<h2><strong>A possible &quot;gotcha&quot;</strong><a class="headerlink" href="#a-possible-gotcha" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>As mentioned earlier, re-slicing a slice doesn't make a copy of the
-underlying array. The full array will be kept in memory until it is no
-longer referenced. Occasionally this can cause the program to hold all
-the data in memory when only a small piece of it is needed.</p>
-<p>For example, this <code class="docutils literal notranslate"><span class="pre">FindDigits</span></code> function loads a file into memory and
-searches it for the first group of consecutive numeric digits, returning
-them as a new slice.</p>
-<p>{{code &quot;/doc/progs/slices.go&quot; `/digit/` `/STOP/<a href="#id9"><span class="problematic" id="id10">`</span></a>}}</p>
-<p>This code behaves as advertised, but the returned <code class="docutils literal notranslate"><span class="pre">[]byte</span></code> points into
-an array containing the entire file. Since the slice references the
-original array, as long as the slice is kept around the garbage
-collector can't release the array; the few useful bytes of the file keep
-the entire contents in memory.</p>
-<p>To fix this problem one can copy the interesting data to a new slice
-before returning it:</p>
-<p>{{code &quot;/doc/progs/slices.go&quot; `/CopyDigits/` `/STOP/<a href="#id11"><span class="problematic" id="id12">`</span></a>}}</p>
-<p>A more concise version of this function could be constructed by using
-<code class="docutils literal notranslate"><span class="pre">append</span></code>. This is left as an exercise for the reader.</p>
 </div>
-<div class="section" id="further-reading">
-<h2><strong>Further Reading</strong><a class="headerlink" href="#further-reading" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p><a class="reference external" href="/doc/effective_go.html">Effective Go</a> contains an in-depth treatment
-of <a class="reference external" href="/doc/effective_go.html#slices">slices</a> and
-<a class="reference external" href="/doc/effective_go.html#arrays">arrays</a>, and the Go <a class="reference external" href="/doc/go_spec.html">language
-specification</a> defines
-<a class="reference external" href="/doc/go_spec.html#Slice_types">slices</a> and their
-<a class="reference external" href="/doc/go_spec.html#Length_and_capacity">associated</a>
-<a class="reference external" href="/doc/go_spec.html#Making_slices_maps_and_channels">helper</a>
-<a class="reference external" href="/doc/go_spec.html#Appending_and_copying_slices">functions</a>.</p>
+<div class="section" id="id8">
+<h2>落とし穴<a class="headerlink" href="#id8" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>前述のように、スライスからスライスを切り出しても、基となる配列のコピーは作成されません。配列全体は、参照されなくなるまでメモリに保持されます。場合によっては、必要なデータの一部のみが必要なときに、プログラムがすべてのスライスのデータをメモリに保持することがあります。</p>
+<p>たとえば、この <code class="docutils literal notranslate"><span class="pre">FindDigits</span></code> 関数はファイルをメモリにロードし、連続する数字の最初のグループを検索して、新しいスライスとして返します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">digitRegexp</span> <span class="p">=</span> <span class="nx">regexp</span><span class="p">.</span><span class="nx">MustCompile</span><span class="p">(</span><span class="s">&quot;[0-9]+&quot;</span><span class="p">)</span>
+
+<span class="kd">func</span> <span class="nx">FindDigits</span><span class="p">(</span><span class="nx">filename</span> <span class="kt">string</span><span class="p">)</span> <span class="p">[]</span><span class="kt">byte</span> <span class="p">{</span>
+   <span class="nx">b</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">filename</span><span class="p">)</span>
+   <span class="k">return</span> <span class="nx">digitRegexp</span><span class="p">.</span><span class="nx">Find</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>このコードは仕様の通りに動作しますが、返される <code class="docutils literal notranslate"><span class="pre">[]byte</span></code> はファイル全体を含む配列を指します。スライスは基の配列を参照するため、スライスがガベージコレクターの対象にならない限り、配列を解放することはできません。ファイルの一部しか使わないにもかかわらず、ファイルの内容全体をメモリに保持します。</p>
+<p>この問題を改善するために、もとのファイルのデータを新しいスライスにコピーしてから返すことができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">CopyDigits</span><span class="p">(</span><span class="nx">filename</span> <span class="kt">string</span><span class="p">)</span> <span class="p">[]</span><span class="kt">byte</span> <span class="p">{</span>
+   <span class="nx">b</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">filename</span><span class="p">)</span>
+   <span class="nx">b</span> <span class="p">=</span> <span class="nx">digitRegexp</span><span class="p">.</span><span class="nx">Find</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+   <span class="nx">c</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">b</span><span class="p">))</span>
+   <span class="nb">copy</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="nx">b</span><span class="p">)</span>
+   <span class="k">return</span> <span class="nx">c</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p>[訳注] <code class="docutils literal notranslate"><span class="pre">append</span></code> を用いる場合の例を示します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">CopyDigits</span><span class="p">(</span><span class="nx">filename</span> <span class="kt">string</span><span class="p">)</span> <span class="p">[]</span><span class="kt">byte</span> <span class="p">{</span>
+   <span class="nx">b</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">filename</span><span class="p">)</span>
+   <span class="nx">b</span> <span class="p">=</span> <span class="nx">digitRegexp</span><span class="p">.</span><span class="nx">Find</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+   <span class="nx">c</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">b</span><span class="o">...</span><span class="p">)</span>
+   <span class="k">return</span> <span class="nx">c</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<p>この関数のより簡潔なバージョンは、<code class="docutils literal notranslate"><span class="pre">append</span></code> を使用して実装できます。これは読者の演習にしましょう。</p>
+</div>
+<div class="section" id="id9">
+<h2>関連資料<a class="headerlink" href="#id9" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p><a class="reference external" href="/doc/effective_go.html">Effective Go</a> には <a class="reference external" href="/doc/effective_go.html#slices">スライス</a> と <a class="reference external" href="/doc/effective_go.html#arrays">配列</a> の詳細な処理が含まれており、Goの <a class="reference external" href="/doc/go_spec.html">言語仕様</a> では <a class="reference external" href="/doc/effective_go.html#slices">スライス</a> とそれに <a class="reference external" href="/doc/go_spec.html#Length_and_capacity">関連する</a> <a class="reference external" href="/doc/go_spec.html#Making_slices_maps_and_channels">ヘルパー</a> <a class="reference external" href="/doc/go_spec.html#Appending_and_copying_slices">関数</a> が定義されています。</p>
 </div>
 </div>
 
