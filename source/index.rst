@@ -8,7 +8,8 @@ The Go Blog
 .. toctree::
     :maxdepth: 1
 
-    goConcurrencyPatternsContext
+    slices_usage_and_internals
+    context
 
 .. toctree::
     :maxdepth: 1
