@@ -170,12 +170,7 @@ Tは、作成するスライスの要素の型です。``make`` 関数は、型�
 スライスの拡張(コピーと ``append`` 関数)
 ============================================
 
-To increase the capacity of a slice one must create a new, larger slice
-and copy the contents of the original slice into it. This technique is
-how dynamic array implementations from other languages work behind the
-scenes. The next example doubles the capacity of ``s`` by making a new
-slice, ``t``, copying the contents of ``s`` into ``t``, and then
-assigning the slice value ``t`` to ``s``:
+スライスの容量を増やすには、新しい大きなスライスを作成し、元のスライスの内容をそこにコピーする必要があります。内部的には、他言語の動的な配列実装のテクニックを用いています。次の例では、新しいスライス ``t`` を作成し、``s ``の内容を ``t`` にコピーし、スライス値 ``t`` を ``s`` に割り当てることにより、``s`` の容量を2倍にします。
 
 .. code-block:: go
 
@@ -185,21 +180,15 @@ assigning the slice value ``t`` to ``s``:
    }
    s = t
 
-The looping piece of this common operation is made easier by the
-built-in copy function. As the name suggests, copy copies data from a
-source slice to a destination slice. It returns the number of elements
-copied.
+ループの中の上記のよく見る操作は、組み込みの ``copy`` 関数によって簡単になります。名前が示すように、``copy`` は元のスライスから宛先のスライスにデータをコピーします。コピーされた要素の数を返します。
 
 .. code-block:: go
 
    func copy(dst, src []T) int
 
-The ``copy`` function supports copying between slices of different
-lengths (it will copy only up to the smaller number of elements). In
-addition, ``copy`` can handle source and destination slices that share
-the same underlying array, handling overlapping slices correctly.
+``copy`` 関数は、異なる長さのスライス間のコピーをサポートします(要素の数が少ない場合のみコピーします)。さらに ``copy`` は基となる配列を共有する、元のスライスと宛先のスライスを扱うことができます。重複するスライスを正しく処理できます。
 
-Using ``copy``, we can simplify the code snippet above:
+``copy`` を使うことで、上記のコードスニペットは以下のようにシンプルになります。
 
 .. code-block:: go
 
@@ -207,13 +196,25 @@ Using ``copy``, we can simplify the code snippet above:
    copy(t, s)
    s = t
 
-A common operation is to append data to the end of a slice. This
-function appends byte elements to a slice of bytes, growing the slice if
-necessary, and returns the updated slice value:
+よく使われる操作は、スライスの最後にデータを追加することです。以下の関数は、バイトのスライスにバイト要素を追加し、必要に応じてスライスを拡大し、更新されたスライス値を返します。
 
-{{code "/doc/progs/slices.go" \`/AppendByte/\` \`/STOP/`}}
+.. code-block:: go
 
-One could use ``AppendByte`` like this:
+   func AppendByte(slice []byte, data ...byte) []byte {
+      m := len(slice)
+      n := m + len(data)
+      if n > cap(slice) { // if necessary, reallocate
+         // allocate double what's needed, for future growth.
+         newSlice := make([]byte, (n+1)*2)
+         copy(newSlice, slice)
+         slice = newSlice
+      }
+      slice = slice[0:n]
+      copy(slice[m:n], data)
+      return slice
+   }
+
+``AppendByte`` は使用例は以下です。
 
 .. code-block:: go
 
@@ -221,21 +222,23 @@ One could use ``AppendByte`` like this:
    p = AppendByte(p, 7, 11, 13)
    // p == []byte{2, 3, 5, 7, 11, 13}
 
-Functions like ``AppendByte`` are useful because they offer complete
-control over the way the slice is grown. Depending on the
-characteristics of the program, it may be desirable to allocate in
-smaller or larger chunks, or to put a ceiling on the size of a
-reallocation.
+``AppendByte`` などの関数は、スライスの成長方法を完全に制御できるため便利です。プログラムの特性に応じて、小さいチャンクまたは大きいチャンクに割り当てるか、再割り当てのサイズに上限を設けることが望ましい場合があります。
 
-But most programs don't need complete control, so Go provides a built-in
-``append`` function that's good for most purposes; it has the signature
+.. todo:: 
+
+   slice の grown は成長と訳すのがいいのかどうか。
+
+   ``AppendByte`` などの関数は、スライスの成長方法を完全に制御できるため便利です。
+
+   Functions like ``AppendByte`` are useful because they offer complete control over the way the slice is grown.
+
+しかし、ほとんどのプログラムは完全な制御を必要としないため、Goはたいていの目的に適した組み込みの ``append`` 関数を提供します。以下のようなシグネチャです。
 
 .. code-block:: go
 
    func append(s []T, x ...T) []T 
 
-The ``append`` function appends the elements ``x`` to the end of the
-slice ``s``, and grows the slice if a greater capacity is needed.
+``append`` 関数はスライス ``s`` の最後に要素 ``x`` を追加し、容量を大きくする必要があればスライスを拡張します。
 
 .. code-block:: go
 
@@ -244,8 +247,7 @@ slice ``s``, and grows the slice if a greater capacity is needed.
    a = append(a, 1, 2, 3)
    // a == []int{0, 1, 2, 3}
 
-To append one slice to another, use ``...`` to expand the second
-argument to a list of arguments.
+スライスを別のスライスに追加するには ``...` を用いて、2番目の引数に、リストの引数を渡します。
 
 .. code-block:: go
 
@@ -254,53 +256,69 @@ argument to a list of arguments.
    a = append(a, b...) // equivalent to "append(a, b[0], b[1], b[2])"
    // a == []string{"John", "Paul", "George", "Ringo", "Pete"}
 
-Since the zero value of a slice (``nil``) acts like a zero-length slice,
-you can declare a slice variable and then append to it in a loop:
+スライスのゼロ値(nil)は長さ0のスライスのように機能するため、スライス変数を宣言してループに追加できます。
 
-{{code "/doc/progs/slices.go" \`/Filter/\` \`/STOP/`}}
+.. code-block:: go
 
-**A possible "gotcha"**
+   // Filter returns a new slice holding only
+   // the elements of s that satisfy fn()
+   func Filter(s []int, fn func(int) bool) []int {
+      var p []int // == nil
+      for _, v := range s {
+         if fn(v) {
+               p = append(p, v)
+         }
+      }
+      return p
+   }
+
+落とし穴
 ============================================
 
-As mentioned earlier, re-slicing a slice doesn't make a copy of the
-underlying array. The full array will be kept in memory until it is no
-longer referenced. Occasionally this can cause the program to hold all
-the data in memory when only a small piece of it is needed.
+前述のように、スライスからスライスを切り出しても、基となる配列のコピーは作成されません。配列全体は、参照されなくなるまでメモリに保持されます。場合によっては、必要なデータの一部のみが必要なときに、プログラムがすべてのスライスのデータをメモリに保持することがあります。
 
-For example, this ``FindDigits`` function loads a file into memory and
-searches it for the first group of consecutive numeric digits, returning
-them as a new slice.
+たとえば、この ``FindDigits`` 関数はファイルをメモリにロードし、連続する数字の最初のグループを検索して、新しいスライスとして返します。
 
-{{code "/doc/progs/slices.go" \`/digit/\` \`/STOP/`}}
+.. code-block:: go
 
-This code behaves as advertised, but the returned ``[]byte`` points into
-an array containing the entire file. Since the slice references the
-original array, as long as the slice is kept around the garbage
-collector can't release the array; the few useful bytes of the file keep
-the entire contents in memory.
+   var digitRegexp = regexp.MustCompile("[0-9]+")
 
-To fix this problem one can copy the interesting data to a new slice
-before returning it:
+   func FindDigits(filename string) []byte {
+      b, _ := ioutil.ReadFile(filename)
+      return digitRegexp.Find(b)
+   }
 
-{{code "/doc/progs/slices.go" \`/CopyDigits/\` \`/STOP/`}}
+このコードは仕様の通りに動作しますが、返される ``[]byte`` はファイル全体を含む配列を指します。スライスは基の配列を参照するため、スライスがガベージコレクターの対象にならない限り、配列を解放することはできません。ファイルの一部しか使わないにもかかわらず、ファイルの内容全体をメモリに保持します。
 
-A more concise version of this function could be constructed by using
-``append``. This is left as an exercise for the reader.
+この問題を改善するために、もとのファイルのデータを新しいスライスにコピーしてから返すことができます。
 
-**Further Reading**
+.. code-block:: go
+
+   func CopyDigits(filename string) []byte {
+      b, _ := ioutil.ReadFile(filename)
+      b = digitRegexp.Find(b)
+      c := make([]byte, len(b))
+      copy(c, b)
+      return c
+   }
+
+.. note:: 
+
+   [訳注] ``append`` を用いる場合の例を示します。
+
+   .. code-block:: go
+
+      func CopyDigits(filename string) []byte {
+         b, _ := ioutil.ReadFile(filename)
+         b = digitRegexp.Find(b)
+         c := make([]byte, b...)
+         return c
+      }
+
+
+この関数のより簡潔なバージョンは、``append`` を使用して実装できます。これは読者の演習にしましょう。
+
+関連資料
 ============================================
 
-`Effective Go </doc/effective_go.html>`__ contains an in-depth treatment
-of `slices </doc/effective_go.html#slices>`__ and
-`arrays </doc/effective_go.html#arrays>`__, and the Go `language
-specification </doc/go_spec.html>`__ defines
-`slices </doc/go_spec.html#Slice_types>`__ and their
-`associated </doc/go_spec.html#Length_and_capacity>`__
-`helper </doc/go_spec.html#Making_slices_maps_and_channels>`__
-`functions </doc/go_spec.html#Appending_and_copying_slices>`__.
-
-.. |image0| image:: slice-array.png
-.. |image1| image:: slice-struct.png
-.. |image2| image:: slice-1.png
-.. |image3| image:: slice-2.png
-.. |image4| image:: slice-3.png
+`Effective Go </doc/effective_go.html>`_ には `スライス </doc/effective_go.html#slices>`_ と `配列 </doc/effective_go.html#arrays>`_ の詳細な処理が含まれており、Goの `言語仕様 </doc/go_spec.html>`_ では `スライス </doc/effective_go.html#slices>`_ とそれに `関連する </doc/go_spec.html#Length_and_capacity>`_ `ヘルパー </doc/go_spec.html#Making_slices_maps_and_channels>`_ `関数 </doc/go_spec.html#Appending_and_copying_slices>`_ が定義されています。
