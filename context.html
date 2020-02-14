@@ -64,147 +64,240 @@
 </pre></div>
 </div>
 <p>(上記の説明は、GoDocの抜粋です)</p>
-<p><code class="docutils literal notranslate"><span class="pre">Done</span></code> メソッドは <code class="docutils literal notranslate"><span class="pre">Context</span></code> に代わって、実行されている関数にキャンセルのシグナルとして機能するチャネルを返します。チャネルが閉じられると、関数は処理を中止して終了します。<code class="docutils literal notranslate"><span class="pre">Err</span></code> メソッドは、<code class="docutils literal notranslate"><span class="pre">Context</span></code> がキャンセルされた理由を示すエラーを返します。「Pipelines and Cancelation」の記事では、<code class="docutils literal notranslate"><span class="pre">Done</span></code> チャンネルのイディオムについて詳しく説明しています。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Done</span></code> メソッドは <code class="docutils literal notranslate"><span class="pre">Context</span></code> に代わって、実行されている関数にキャンセルのシグナルとして機能するチャネルを返します。チャネルが閉じられると、関数は処理を中止して終了します。<code class="docutils literal notranslate"><span class="pre">Err</span></code> メソッドは、<code class="docutils literal notranslate"><span class="pre">Context</span></code> がキャンセルされた理由を示すエラーを返します。「Pipelines and Cancelation」の記事では、<code class="docutils literal notranslate"><span class="pre">Done</span></code> チャネルのイディオムについて詳しく説明しています。</p>
 <p><code class="docutils literal notranslate"><span class="pre">Done</span></code> チャネルが受信専用であることと同じ理由で、<code class="docutils literal notranslate"><span class="pre">Context</span></code> は <code class="docutils literal notranslate"><span class="pre">Cancel</span></code> メソッドが <cite>ありません</cite> 。通常の場合、キャンセルシグナルを受信する関数はシグナルを送信する関数ではありません。特に親の操作が子の操作としてゴルーチンを開始する場合、子の操作は親をキャンセルできないようにすべきです。代わりに <code class="docutils literal notranslate"><span class="pre">WithCancel</span></code> 関数(後ほど説明)はキャンセルするための <code class="docutils literal notranslate"><span class="pre">Context</span></code> の値を提供します。</p>
 <p><code class="docutils literal notranslate"><span class="pre">Context</span></code> は、複数のゴルーチンで同時に使用しても安全です。コードは1つの <code class="docutils literal notranslate"><span class="pre">Context</span></code> を任意の数のゴルーチンに渡し、その <code class="docutils literal notranslate"><span class="pre">Context</span></code> をキャンセルしてすべてのゴルーチンを通知できます。</p>
-<p><code class="docutils literal notranslate"><span class="pre">Deadline</span></code> メソッドを使用すると、関数で処理を開始するかどうかを決定できます。あまりにも短い時間しか残っていない場合、処理する価値がないかもしれません。コードは期限を用いて、I/O操作のタイムアウトを設定することもできます。</p>
-<p><code class="docutils literal notranslate"><span class="pre">Value</span></code> を使用すると <code class="docutils literal notranslate"><span class="pre">Context</span></code> でリクエストスコープのデータを伝送できます。そのデータは、複数のゴルーチンによる同時使用に対して安全でなければなりません。</p>
-<div class="section" id="derived-contexts">
-<h3>** Derived contexts<a class="headerlink" href="#derived-contexts" title="このヘッドラインへのパーマリンク">¶</a></h3>
-<p>The <cite>context</cite> package provides functions to _derive_ new <cite>Context</cite> values from
-existing ones.
-These values form a tree: when a <cite>Context</cite> is canceled, all <cite>Contexts</cite> derived
-from it are also canceled.</p>
-<p><cite>Background</cite> is the root of any <cite>Context</cite> tree; it is never canceled:</p>
-<p>.code context/interface.go /Background returns/,/func Background/</p>
-<p><cite>WithCancel</cite> and <cite>WithTimeout</cite> return derived <cite>Context</cite> values that can be
-canceled sooner than the parent <cite>Context</cite>.
-The <cite>Context</cite> associated with an incoming request is typically canceled when the
-request handler returns.
-<cite>WithCancel</cite> is also useful for canceling redundant requests when using multiple
-replicas.
-<cite>WithTimeout</cite> is useful for setting a deadline on requests to backend servers:</p>
-<p>.code context/interface.go /WithCancel/,/func WithTimeout/</p>
-<p><cite>WithValue</cite> provides a way to associate request-scoped values with a <cite>Context</cite>:</p>
-<p>.code context/interface.go /WithValue/,/func WithValue/</p>
-<p>The best way to see how to use the <cite>context</cite> package is through a worked
-example.</p>
-<ul class="simple">
-<li><p>Example: Google Web Search</p></li>
-</ul>
-<hr class="docutils" />
-<p>Our example is an HTTP server that handles URLs like
-<cite>/search?q=golang&amp;timeout=1s</cite> by forwarding the query &quot;golang&quot; to the
-[[<a class="reference external" href="https://developers.google.com/web-search/docs/][Google">https://developers.google.com/web-search/docs/][Google</a> Web Search API]] and
-rendering the results.
-The <cite>timeout</cite> parameter tells the server to cancel the request after that
-duration elapses.</p>
-<p>The code is split across three packages:</p>
-<ul class="simple">
-<li><p>[[context/server/server.go][server]] provides the <cite>main</cite> function and the handler for <cite>/search</cite>.</p></li>
-<li><p>[[context/userip/userip.go][userip]] provides functions for extracting a user IP address from a request and associating it with a <cite>Context</cite>.</p></li>
-<li><p>[[context/google/google.go][google]] provides the <cite>Search</cite> function for sending a query to Google.</p></li>
-</ul>
+<p><code class="docutils literal notranslate"><span class="pre">Deadline</span></code> メソッドを使用すると、関数で処理を開始するかどうかを決定できます。期限までほとんど時間がない場合、処理する価値がないかもしれません。コードはを用いて、I/O操作のタイムアウトを設定することもできます。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Value</span></code> を使用すると <code class="docutils literal notranslate"><span class="pre">Context</span></code> でリクエストスコープのデータを送ることができます。そのデータは、複数のゴルーチンによる同時使用に対して安全でなければなりません。</p>
+<div class="section" id="id2">
+<h3>コンテキストの派生<a class="headerlink" href="#id2" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">context</span></code> パッケージは元のコンテキストから新しい <code class="docutils literal notranslate"><span class="pre">Context</span></code> の値を生成する関数を提供しています。コンテキストは木を形成します。根の <code class="docutils literal notranslate"><span class="pre">Context</span></code> がキャンセルされると、そこから派生したすべての <code class="docutils literal notranslate"><span class="pre">Context</span></code> もキャンセルされます。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Background</span></code> は <code class="docutils literal notranslate"><span class="pre">Context</span></code> の木の根になります。キャンセルされることはありません。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Background returns an empty Context. It is never canceled, has no deadline,</span>
+<span class="c1">// and has no values. Background is typically used in main, init, and tests,</span>
+<span class="c1">// and as the top-level Context for incoming requests.</span>
+<span class="kd">func</span> <span class="nx">Background</span><span class="p">()</span> <span class="nx">Context</span>
+</pre></div>
 </div>
-<div class="section" id="the-server-program">
-<h3>** The server program<a class="headerlink" href="#the-server-program" title="このヘッドラインへのパーマリンク">¶</a></h3>
-<p>The [[context/server/server.go][server]] program handles requests like
-<cite>/search?q=golang</cite> by serving the first few Google search results for <cite>golang</cite>.
-It registers <cite>handleSearch</cite> to handle the <cite>/search</cite> endpoint.
-The handler creates an initial <cite>Context</cite> called <cite>ctx</cite> and arranges for it to be
-canceled when the handler returns.
-If the request includes the <cite>timeout</cite> URL parameter, the <cite>Context</cite> is canceled
-automatically when the timeout elapses:</p>
-<p>.code context/server/server.go /func handleSearch/,/defer cancel/</p>
-<p>The handler extracts the query from the request and extracts the client's IP
-address by calling on the <cite>userip</cite> package.
-The client's IP address is needed for backend requests, so <cite>handleSearch</cite>
-attaches it to <cite>ctx</cite>:</p>
-<p>.code context/server/server.go /Check the search query/,/userip.NewContext/</p>
-<p>The handler calls <cite>google.Search</cite> with <cite>ctx</cite> and the <cite>query</cite>:</p>
-<p>.code context/server/server.go /Run the Google search/,/elapsed/</p>
-<p>If the search succeeds, the handler renders the results:</p>
-<p>.code context/server/server.go /resultsTemplate/,/}$/</p>
+<p><code class="docutils literal notranslate"><span class="pre">WithCancel</span></code> と <code class="docutils literal notranslate"><span class="pre">WithTimeout</span></code> は派生した <code class="docutils literal notranslate"><span class="pre">Context</span></code> の値を返し、それらは親の <code class="docutils literal notranslate"><span class="pre">Context</span></code> よりも早くキャンセルできます。通常 <code class="docutils literal notranslate"><span class="pre">Context</span></code> はリクエストに関連する <code class="docutils literal notranslate"><span class="pre">Context</span></code> はリクエストハンドラが返却されるとキャンセルされます。</p>
+<div class="admonition-todo admonition" id="id3">
+<p class="admonition-title">課題</p>
+<p>ちょっと違和感がある。</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">Context</span></code> associated with an incoming request is typically canceled when the request handler returns.</p>
 </div>
-<div class="section" id="package-userip">
-<h3>** Package userip<a class="headerlink" href="#package-userip" title="このヘッドラインへのパーマリンク">¶</a></h3>
-<p>The [[context/userip/userip.go][userip]] package provides functions for
-extracting a user IP address from a request and associating it with a <cite>Context</cite>.
-A <cite>Context</cite> provides a key-value mapping, where the keys and values are both of
-type <cite>interface{}</cite>.
-Key types must support equality, and values must be safe for simultaneous use by
-multiple goroutines.
-Packages like <cite>userip</cite> hide the details of this mapping and provide
-strongly-typed access to a specific <cite>Context</cite> value.</p>
-<p>To avoid key collisions, <cite>userip</cite> defines an unexported type <cite>key</cite> and uses
-a value of this type as the context key:</p>
-<p>.code context/userip/userip.go /The key type/,/const userIPKey/</p>
-<p><cite>FromRequest</cite> extracts a <cite>userIP</cite> value from an <cite>http.Request</cite>:</p>
-<p>.code context/userip/userip.go /func FromRequest/,/}/</p>
-<p><cite>NewContext</cite> returns a new <cite>Context</cite> that carries a provided <cite>userIP</cite> value:</p>
-<p>.code context/userip/userip.go /func NewContext/,/}/</p>
-<p><cite>FromContext</cite> extracts a <cite>userIP</cite> from a <cite>Context</cite>:</p>
-<p>.code context/userip/userip.go /func FromContext/,/}/</p>
+<p><code class="docutils literal notranslate"><span class="pre">WithCancel</span></code> は複数のレプリカを使用しているときに、冗長なリクエストをキャンセルする場合にも役に立ちます。<code class="docutils literal notranslate"><span class="pre">WithTimeout</span></code> はバックエンドサーバへのリクエストに期限を設定するのに役立ちます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// WithCancel returns a copy of parent whose Done channel is closed as soon as</span>
+<span class="c1">// parent.Done is closed or cancel is called.</span>
+<span class="kd">func</span> <span class="nx">WithCancel</span><span class="p">(</span><span class="nx">parent</span> <span class="nx">Context</span><span class="p">)</span> <span class="p">(</span><span class="nx">ctx</span> <span class="nx">Context</span><span class="p">,</span> <span class="nx">cancel</span> <span class="nx">CancelFunc</span><span class="p">)</span>
+
+<span class="c1">// A CancelFunc cancels a Context.</span>
+<span class="kd">type</span> <span class="nx">CancelFunc</span> <span class="kd">func</span><span class="p">()</span>
+
+<span class="c1">// WithTimeout returns a copy of parent whose Done channel is closed as soon as</span>
+<span class="c1">// parent.Done is closed, cancel is called, or timeout elapses. The new</span>
+<span class="c1">// Context&#39;s Deadline is the sooner of now+timeout and the parent&#39;s deadline, if</span>
+<span class="c1">// any. If the timer is still running, the cancel function releases its</span>
+<span class="c1">// resources.</span>
+<span class="kd">func</span> <span class="nx">WithTimeout</span><span class="p">(</span><span class="nx">parent</span> <span class="nx">Context</span><span class="p">,</span> <span class="nx">timeout</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span><span class="p">)</span> <span class="p">(</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">CancelFunc</span><span class="p">)</span>
+</pre></div>
 </div>
-<div class="section" id="package-google">
-<h3>** Package google<a class="headerlink" href="#package-google" title="このヘッドラインへのパーマリンク">¶</a></h3>
-<p>The [[context/google/google.go][google.Search]] function makes an HTTP request
-to the [[<a class="reference external" href="https://developers.google.com/web-search/docs/][Google">https://developers.google.com/web-search/docs/][Google</a> Web Search API]]
-and parses the JSON-encoded result.
-It accepts a <cite>Context</cite> parameter <cite>ctx</cite> and returns immediately if <cite>ctx.Done</cite> is
-closed while the request is in flight.</p>
-<p>The Google Web Search API request includes the search query and the user IP as
-query parameters:</p>
-<p>.code context/google/google.go /func Search/,/q.Encode/</p>
-<p><cite>Search</cite> uses a helper function, <cite>httpDo</cite>, to issue the HTTP request and cancel
-it if <cite>ctx.Done</cite> is closed while the request or response is being processed.
-<cite>Search</cite> passes a closure to <cite>httpDo</cite> handle the HTTP response:</p>
-<p>.code context/google/google.go /var results/,/return results/</p>
-<p>The <cite>httpDo</cite> function runs the HTTP request and processes its response in a new
-goroutine.
-It cancels the request if <cite>ctx.Done</cite> is closed before the goroutine exits:</p>
-<p>.code context/google/google.go /func httpDo/,/^}/</p>
+<p><code class="docutils literal notranslate"><span class="pre">WithValue</span></code> はリクエストスコープの値を <code class="docutils literal notranslate"><span class="pre">Context</span></code> に関連付ける方法を提供します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// WithValue returns a copy of parent whose Value method returns val for key.</span>
+<span class="kd">func</span> <span class="nx">WithValue</span><span class="p">(</span><span class="nx">parent</span> <span class="nx">Context</span><span class="p">,</span> <span class="nx">key</span> <span class="kd">interface</span><span class="p">{},</span> <span class="nx">val</span> <span class="kd">interface</span><span class="p">{})</span> <span class="nx">Context</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Context</span></code> の使用方法を知る最善の方法は、実際の例を使用することです。</p>
+</div>
+</div>
+<div class="section" id="googleweb">
+<h2>例: GoogleのWeb検索<a class="headerlink" href="#googleweb" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>「golang」を検索するクエリを <a class="reference external" href="[https://developers.google.com/web-search/docs/">Google Web Search API</a> に投げ、結果をレンダリングする <code class="docutils literal notranslate"><span class="pre">/search?q=golang&amp;timeout=1s</span></code> のようなURLを扱うHTTPサーバの例を見てみましょう。<code class="docutils literal notranslate"><span class="pre">timeout</span></code> パラメータはその期間が経過した後にリクエストをキャンセルするようにサーバーに指示します。</p>
+<p>コードは以下の3つのパッケージに分かれます。</p>
 <ul class="simple">
-<li><p>Adapting code for Contexts</p></li>
+<li><p><a class="reference external" href="https://blog.golang.org/context/server/server.go">server</a> はメイン関数と <code class="docutils literal notranslate"><span class="pre">/search</span></code> を扱うハンドラを提供します。</p></li>
+<li><p><a class="reference external" href="https://blog.golang.org/context/userip/userip.go">userip</a> はリクエストからユーザーIPアドレスを抽出し、それを <code class="docutils literal notranslate"><span class="pre">Context</span></code> に関連付ける機能を提供します。</p></li>
+<li><p><a class="reference external" href="https://blog.golang.org/context/google/google.go">google</a> はクエリをGoogleに送信するための <code class="docutils literal notranslate"><span class="pre">検索</span></code> 機能を提供します。</p></li>
 </ul>
-<hr class="docutils" />
-<p>Many server frameworks provide packages and types for carrying request-scoped
-values.
-We can define new implementations of the <cite>Context</cite> interface to bridge between
-code using existing frameworks and code that expects a <cite>Context</cite> parameter.</p>
-<p>For example, Gorilla's
-[[<a class="reference external" href="http://www.gorillatoolkit.org/pkg/context][github.com/gorilla/context">http://www.gorillatoolkit.org/pkg/context][github.com/gorilla/context</a>]]
-package allows handlers to associate data with incoming requests by providing a
-mapping from HTTP requests to key-value pairs.
-In [[context/gorilla/gorilla.go][gorilla.go]], we provide a <cite>Context</cite>
-implementation whose <cite>Value</cite> method returns the values associated with a
-specific HTTP request in the Gorilla package.</p>
-<p>Other packages have provided cancelation support similar to <cite>Context</cite>.
-For example, [[<a class="reference external" href="https://godoc.org/gopkg.in/tomb.v2][Tomb">https://godoc.org/gopkg.in/tomb.v2][Tomb</a>]] provides a <cite>Kill</cite>
-method that signals cancelation by closing a <cite>Dying</cite> channel.
-<cite>Tomb</cite> also provides methods to wait for those goroutines to exit, similar to
-<cite>sync.WaitGroup</cite>.
-In [[context/tomb/tomb.go][tomb.go]], we provide a <cite>Context</cite> implementation that
-is canceled when either its parent <cite>Context</cite> is canceled or a provided <cite>Tomb</cite> is
-killed.</p>
-<ul class="simple">
-<li><p>Conclusion</p></li>
-</ul>
-<hr class="docutils" />
-<p>At Google, we require that Go programmers pass a <cite>Context</cite> parameter as the
-first argument to every function on the call path between incoming and outgoing
-requests.
-This allows Go code developed by many different teams to interoperate well.
-It provides simple control over timeouts and cancelation and ensures that
-critical values like security credentials transit Go programs properly.</p>
-<p>Server frameworks that want to build on <cite>Context</cite> should provide implementations
-of <cite>Context</cite> to bridge between their packages and those that expect a <cite>Context</cite>
-parameter.
-Their client libraries would then accept a <cite>Context</cite> from the calling code.
-By establishing a common interface for request-scoped data and cancelation,
-<cite>Context</cite> makes it easier for package developers to share code for creating
-scalable services.</p>
+<div class="section" id="id4">
+<h3>サーバープログラム<a class="headerlink" href="#id4" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p><a class="reference external" href="https://blog.golang.org/context/server/server.go">サーバー</a> プログラムは <code class="docutils literal notranslate"><span class="pre">golang</span></code> の最初のいくつかのGoogle検索結果を提供することにより、<code class="docutils literal notranslate"><span class="pre">/search?q=golang</span></code> などのリクエストを処理します。<code class="docutils literal notranslate"><span class="pre">handlesearch</span></code> を <code class="docutils literal notranslate"><span class="pre">/search</span></code> エンドポイントに登録します。ハンドラは <code class="docutils literal notranslate"><span class="pre">ctx</span></code> という起点になる <code class="docutils literal notranslate"><span class="pre">Context</span></code> を作成し、ハンドラが戻ったときにキャンセルされるように調整します。リクエストに <code class="docutils literal notranslate"><span class="pre">timeout</span></code> のクエリパラメーターが含まれている場合、タイムアウトが経過するとコンテキストは自動的にキャンセルされます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">handleSearch</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// ctx is the Context for this handler. Calling cancel closes the</span>
+    <span class="c1">// ctx.Done channel, which is the cancellation signal for requests</span>
+    <span class="c1">// started by this handler.</span>
+    <span class="kd">var</span> <span class="p">(</span>
+        <span class="nx">ctx</span>    <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+        <span class="nx">cancel</span> <span class="nx">context</span><span class="p">.</span><span class="nx">CancelFunc</span>
+    <span class="p">)</span>
+    <span class="nx">timeout</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nx">ParseDuration</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">FormValue</span><span class="p">(</span><span class="s">&quot;timeout&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="c1">// The request has a timeout, so create a context that is</span>
+        <span class="c1">// canceled automatically when the timeout expires.</span>
+        <span class="nx">ctx</span><span class="p">,</span> <span class="nx">cancel</span> <span class="p">=</span> <span class="nx">context</span><span class="p">.</span><span class="nx">WithTimeout</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">(),</span> <span class="nx">timeout</span><span class="p">)</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="nx">ctx</span><span class="p">,</span> <span class="nx">cancel</span> <span class="p">=</span> <span class="nx">context</span><span class="p">.</span><span class="nx">WithCancel</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">())</span>
+    <span class="p">}</span>
+    <span class="k">defer</span> <span class="nx">cancel</span><span class="p">()</span> <span class="c1">// Cancel ctx as soon as handleSearch returns.</span>
+</pre></div>
 </div>
+<p>ハンドラーは、リクエストからクエリを抽出し <code class="docutils literal notranslate"><span class="pre">userip</span></code> パッケージを呼び出してクライアントのIPアドレスを抽出します。クライアントのIPアドレスはバックエンドへのリクエストに必要であるため <code class="docutils literal notranslate"><span class="pre">handleSearch</span></code> はIPアドレスを <code class="docutils literal notranslate"><span class="pre">ctx</span></code> に付与します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Check the search query.</span>
+<span class="nx">query</span> <span class="o">:=</span> <span class="nx">req</span><span class="p">.</span><span class="nx">FormValue</span><span class="p">(</span><span class="s">&quot;q&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="nx">query</span> <span class="o">==</span> <span class="s">&quot;&quot;</span> <span class="p">{</span>
+    <span class="nx">http</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="s">&quot;no query&quot;</span><span class="p">,</span> <span class="nx">http</span><span class="p">.</span><span class="nx">StatusBadRequest</span><span class="p">)</span>
+    <span class="k">return</span>
+<span class="p">}</span>
+
+<span class="c1">// Store the user IP in ctx for use by code in other packages.</span>
+<span class="nx">userIP</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">userip</span><span class="p">.</span><span class="nx">FromRequest</span><span class="p">(</span><span class="nx">req</span><span class="p">)</span>
+<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="nx">http</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">Error</span><span class="p">(),</span> <span class="nx">http</span><span class="p">.</span><span class="nx">StatusBadRequest</span><span class="p">)</span>
+    <span class="k">return</span>
+<span class="p">}</span>
+<span class="nx">ctx</span> <span class="p">=</span> <span class="nx">userip</span><span class="p">.</span><span class="nx">NewContext</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">userIP</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>ハンドラは <code class="docutils literal notranslate"><span class="pre">ctx</span></code> と <code class="docutils literal notranslate"><span class="pre">query</span></code> を使用して <code class="docutils literal notranslate"><span class="pre">google.Search</span></code> を呼び出します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Run the Google search and print the results.</span>
+<span class="nx">start</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Now</span><span class="p">()</span>
+<span class="nx">results</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">google</span><span class="p">.</span><span class="nx">Search</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">query</span><span class="p">)</span>
+<span class="nx">elapsed</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Since</span><span class="p">(</span><span class="nx">start</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>検索が完了すると、ハンドラは検索結果をレンダリングします。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">resultsTemplate</span><span class="p">.</span><span class="nx">Execute</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Results</span>          <span class="nx">google</span><span class="p">.</span><span class="nx">Results</span>
+    <span class="nx">Timeout</span><span class="p">,</span> <span class="nx">Elapsed</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span>
+<span class="p">}{</span>
+    <span class="nx">Results</span><span class="p">:</span> <span class="nx">results</span><span class="p">,</span>
+    <span class="nx">Timeout</span><span class="p">:</span> <span class="nx">timeout</span><span class="p">,</span>
+    <span class="nx">Elapsed</span><span class="p">:</span> <span class="nx">elapsed</span><span class="p">,</span>
+<span class="p">});</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="nx">log</span><span class="p">.</span><span class="nx">Print</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+    <span class="k">return</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id6">
+<h3>useripパッケージ<a class="headerlink" href="#id6" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p><a class="reference external" href="https://blog.golang.org/context/userip/userip.go">userip</a> パッケージは、リクエストからユーザーIPアドレスを抽出し、それを <code class="docutils literal notranslate"><span class="pre">Context</span></code> に関連付ける機能を提供します。<code class="docutils literal notranslate"><span class="pre">Context</span></code> は、キーと値の両方が型 <code class="docutils literal notranslate"><span class="pre">interface{}</span></code> であるキーと値のマッピングを提供します。キーの型は等価性をサポートする必要があり、値は複数のゴルーチンが同時に使用しても安全でなければなりません。<code class="docutils literal notranslate"><span class="pre">userip</span></code> などのパッケージは、このマッピングの詳細を隠し、特定の <code class="docutils literal notranslate"><span class="pre">Context</span></code> 値への厳密に型指定されたアクセスを提供します。</p>
+<p>キーの衝突を避けるために、<code class="docutils literal notranslate"><span class="pre">userip</span></code> はエクスポートされていない <code class="docutils literal notranslate"><span class="pre">key</span></code> 型を定義し、この型の値をコンテキストのキーとして使用します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// The key type is unexported to prevent collisions with context keys defined in</span>
+<span class="c1">// other packages.</span>
+<span class="kd">type</span> <span class="nx">key</span> <span class="kt">int</span>
+
+<span class="c1">// userIPkey is the context key for the user IP address.  Its value of zero is</span>
+<span class="c1">// arbitrary.  If this package defined other context keys, they would have</span>
+<span class="c1">// different integer values.</span>
+<span class="kd">const</span> <span class="nx">userIPKey</span> <span class="nx">key</span> <span class="p">=</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">FromRequest</span></code> は <code class="docutils literal notranslate"><span class="pre">http.Request</span></code> から <code class="docutils literal notranslate"><span class="pre">userIP</span></code> の値を抽出します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">FromRequest</span><span class="p">(</span><span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">(</span><span class="nx">net</span><span class="p">.</span><span class="nx">IP</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">ip</span><span class="p">,</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">net</span><span class="p">.</span><span class="nx">SplitHostPort</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">RemoteAddr</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;userip: %q is not IP:port&quot;</span><span class="p">,</span> <span class="nx">req</span><span class="p">.</span><span class="nx">RemoteAddr</span><span class="p">)</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">NewContext</span></code> は、指定された <code class="docutils literal notranslate"><span class="pre">userIP</span></code> 値を保持する新しい <code class="docutils literal notranslate"><span class="pre">Context</span></code> を返します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">NewContext</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">userIP</span> <span class="nx">net</span><span class="p">.</span><span class="nx">IP</span><span class="p">)</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">context</span><span class="p">.</span><span class="nx">WithValue</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">userIPKey</span><span class="p">,</span> <span class="nx">userIP</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">FromContext</span></code> は <code class="docutils literal notranslate"><span class="pre">Context</span></code> から <code class="docutils literal notranslate"><span class="pre">userIP</span></code> を抽出します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">FromContext</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">(</span><span class="nx">net</span><span class="p">.</span><span class="nx">IP</span><span class="p">,</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// ctx.Value returns nil if ctx has no value for the key;</span>
+    <span class="c1">// the net.IP type assertion returns ok=false for nil.</span>
+    <span class="nx">userIP</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">ctx</span><span class="p">.</span><span class="nx">Value</span><span class="p">(</span><span class="nx">userIPKey</span><span class="p">).(</span><span class="nx">net</span><span class="p">.</span><span class="nx">IP</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">userIP</span><span class="p">,</span> <span class="nx">ok</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id8">
+<h3>googleパッケージ<a class="headerlink" href="#id8" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p><a class="reference external" href="https://blog.golang.org/context/google/google.go">google.Search</a> 関数は <a class="reference external" href="https://developers.google.com/web-search/docs/">Google Web Search API</a> へのHTTPリクエストを作成し、JSONエンコードされた結果を解析します。<code class="docutils literal notranslate"><span class="pre">Context</span></code> パラメータ <code class="docutils literal notranslate"><span class="pre">ctx</span></code> を受け取り、リクエストの実行中に <code class="docutils literal notranslate"><span class="pre">ctx.Done</span></code> が閉じられるとすぐに戻ります。</p>
+<p>Google Web Search APIリクエストには、クエリパラメータとして検索クエリとユーザーIPが含まれます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Search</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">query</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="nx">Results</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// Prepare the Google Search API request.</span>
+    <span class="nx">req</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">http</span><span class="p">.</span><span class="nx">NewRequest</span><span class="p">(</span><span class="s">&quot;GET&quot;</span><span class="p">,</span> <span class="s">&quot;https://ajax.googleapis.com/ajax/services/search/web?v=1.0&quot;</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+    <span class="p">}</span>
+    <span class="nx">q</span> <span class="o">:=</span> <span class="nx">req</span><span class="p">.</span><span class="nx">URL</span><span class="p">.</span><span class="nx">Query</span><span class="p">()</span>
+    <span class="nx">q</span><span class="p">.</span><span class="nx">Set</span><span class="p">(</span><span class="s">&quot;q&quot;</span><span class="p">,</span> <span class="nx">query</span><span class="p">)</span>
+
+    <span class="c1">// If ctx is carrying the user IP address, forward it to the server.</span>
+    <span class="c1">// Google APIs use the user IP to distinguish server-initiated requests</span>
+    <span class="c1">// from end-user requests.</span>
+    <span class="k">if</span> <span class="nx">userIP</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">userip</span><span class="p">.</span><span class="nx">FromContext</span><span class="p">(</span><span class="nx">ctx</span><span class="p">);</span> <span class="nx">ok</span> <span class="p">{</span>
+        <span class="nx">q</span><span class="p">.</span><span class="nx">Set</span><span class="p">(</span><span class="s">&quot;userip&quot;</span><span class="p">,</span> <span class="nx">userIP</span><span class="p">.</span><span class="nx">String</span><span class="p">())</span>
+    <span class="p">}</span>
+    <span class="nx">req</span><span class="p">.</span><span class="nx">URL</span><span class="p">.</span><span class="nx">RawQuery</span> <span class="p">=</span> <span class="nx">q</span><span class="p">.</span><span class="nx">Encode</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Search</span></code> では、ヘルパー関数 <code class="docutils literal notranslate"><span class="pre">httpDo</span></code> を使用してHTTPリクエストを発行し、リクエストまたはレスポンスの処理中に <code class="docutils literal notranslate"><span class="pre">ctx.Done</span></code> が閉じられた場合、キャンセルします。<code class="docutils literal notranslate"><span class="pre">Search</span></code> は <code class="docutils literal notranslate"><span class="pre">httpDo</span></code> にクロージャーを渡し、HTTPレスポンスを処理します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">results</span> <span class="nx">Results</span>
+<span class="nx">err</span> <span class="p">=</span> <span class="nx">httpDo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">req</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">resp</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Response</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">err</span>
+    <span class="p">}</span>
+    <span class="k">defer</span> <span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">.</span><span class="nx">Close</span><span class="p">()</span>
+
+    <span class="c1">// Parse the JSON search result.</span>
+    <span class="c1">// https://developers.google.com/web-search/docs/#fonje</span>
+    <span class="kd">var</span> <span class="nx">data</span> <span class="kd">struct</span> <span class="p">{</span>
+        <span class="nx">ResponseData</span> <span class="kd">struct</span> <span class="p">{</span>
+            <span class="nx">Results</span> <span class="p">[]</span><span class="kd">struct</span> <span class="p">{</span>
+                <span class="nx">TitleNoFormatting</span> <span class="kt">string</span>
+                <span class="nx">URL</span>               <span class="kt">string</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">NewDecoder</span><span class="p">(</span><span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">).</span><span class="nx">Decode</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">data</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">err</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">res</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">data</span><span class="p">.</span><span class="nx">ResponseData</span><span class="p">.</span><span class="nx">Results</span> <span class="p">{</span>
+        <span class="nx">results</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">results</span><span class="p">,</span> <span class="nx">Result</span><span class="p">{</span><span class="nx">Title</span><span class="p">:</span> <span class="nx">res</span><span class="p">.</span><span class="nx">TitleNoFormatting</span><span class="p">,</span> <span class="nx">URL</span><span class="p">:</span> <span class="nx">res</span><span class="p">.</span><span class="nx">URL</span><span class="p">})</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="kc">nil</span>
+<span class="p">})</span>
+<span class="c1">// httpDo waits for the closure we provided to return, so it&#39;s safe to</span>
+<span class="c1">// read results here.</span>
+<span class="k">return</span> <span class="nx">results</span><span class="p">,</span> <span class="nx">err</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">httpDo``関数はHTTPリクエストを実行し、そのレスポンスを新しいゴルーチンで処理します。ゴルーチンが終了する前に</span> <span class="pre">``ctx.Done</span></code> が閉じられると、リクエストをキャンセルします。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">httpDo</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">,</span> <span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Response</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="kt">error</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="c1">// Run the HTTP request in a goroutine and pass the response to f.</span>
+    <span class="nx">c</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">error</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="nx">req</span> <span class="p">=</span> <span class="nx">req</span><span class="p">.</span><span class="nx">WithContext</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span>
+    <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="nx">c</span> <span class="o">&lt;-</span> <span class="nx">f</span><span class="p">(</span><span class="nx">http</span><span class="p">.</span><span class="nx">DefaultClient</span><span class="p">.</span><span class="nx">Do</span><span class="p">(</span><span class="nx">req</span><span class="p">))</span> <span class="p">}()</span>
+    <span class="k">select</span> <span class="p">{</span>
+    <span class="k">case</span> <span class="o">&lt;-</span><span class="nx">ctx</span><span class="p">.</span><span class="nx">Done</span><span class="p">():</span>
+        <span class="o">&lt;-</span><span class="nx">c</span> <span class="c1">// Wait for f to return.</span>
+        <span class="k">return</span> <span class="nx">ctx</span><span class="p">.</span><span class="nx">Err</span><span class="p">()</span>
+    <span class="k">case</span> <span class="nx">err</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nx">err</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="id10">
+<h2>コンテキストに合わせたコードの適合<a class="headerlink" href="#id10" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>多くのサーバーフレームワークは、リクエストスコープの値を運ぶためのパッケージと型を提供します。<code class="docutils literal notranslate"><span class="pre">Context</span></code> インターフェースの新しい実装を定義して、既存のフレームワークを使用するコードと <code class="docutils literal notranslate"><span class="pre">Context</span></code> パラメーターを必要とするコードを橋渡しします。</p>
+<p>例えば、Gorillaの <a class="reference external" href="http://www.gorillatoolkit.org/pkg/context">github.com/gorilla/context</a> パッケージを使用すると、ハンドラーはHTTPリクエストからキーと値のペアへのマッピングを提供することで、要求されたリクエストにデータを関連付けることができます。<a class="reference external" href="https://blog.golang.org/context/gorilla/gorilla.go">gorilla.go</a> では、ValueメソッドがGorillaパッケージの特定のHTTPリクエストに関連付けられた値を返す <code class="docutils literal notranslate"><span class="pre">Context</span></code> 実装を提供します。</p>
+<p>他のパッケージは <code class="docutils literal notranslate"><span class="pre">Context</span></code> と同様のキャンセルサポートを提供しています。 例えば <a class="reference external" href="https://godoc.org/gopkg.in/tomb.v2">Tomb</a> は <code class="docutils literal notranslate"><span class="pre">Dying</span></code> チャネルを閉じることによりキャンセルを通知するKillメソッドを提供します。<code class="docutils literal notranslate"><span class="pre">Tomb</span></code> は <code class="docutils literal notranslate"><span class="pre">sync.WaitGroup</span></code> と同様に、これらのゴルーチンが終了するのを待つメソッドも提供します。<a class="reference external" href="https://blog.golang.org/context/tomb/tomb.go">tomb.go</a> では、親 <code class="docutils literal notranslate"><span class="pre">Context</span></code> がキャンセルされるか、提供された <code class="docutils literal notranslate"><span class="pre">Tomb</span></code> が強制終了されるとキャンセルされる <code class="docutils literal notranslate"><span class="pre">Context</span></code> 実装を提供します。</p>
+</div>
+<div class="section" id="id11">
+<h2>結論<a class="headerlink" href="#id11" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>Googleでは、リクエストとレスポンスの間で呼び出されるすべての関数に、最初の引数として <code class="docutils literal notranslate"><span class="pre">Context</span></code> パラメータを渡すことを要求しています。これによりGoのコードは多くの異なるチームで相互運用できます。タイムアウトとキャンセルを簡単に制御し、またセキュリティ資格情報などの重要な値がGoのプログラム上で適切に扱われるようにします。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Context</span></code> に用いて実装したいサーバーフレームワークは、フレームワークと <code class="docutils literal notranslate"><span class="pre">Context</span></code> パラメーターを期待するパッケージとの間を橋渡しする <code class="docutils literal notranslate"><span class="pre">Context</span></code> の実装を提供する必要があります。クライアントライブラリは、呼び出し元のコードから <code class="docutils literal notranslate"><span class="pre">Context</span></code> を受け入れます。リクエストスコープのデータとキャンセル用の共通インターフェースを構築することにより、<code class="docutils literal notranslate"><span class="pre">Context</span></code> はパッケージ開発者がスケーラブルなサービスを作成するためのコードを簡単に共有できるようにします。</p>
 </div>
 </div>
 
