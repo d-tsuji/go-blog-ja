@@ -35,6 +35,177 @@
             
   <a href="https://github.com/d-tsuji/go-introduction-book"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><div class="section" id="go-concurrency-patterns-context">
 <h1>Go Concurrency Patterns: Context<a class="headerlink" href="#go-concurrency-patterns-context" title="このヘッドラインへのパーマリンク">¶</a></h1>
+<div class="section" id="id1">
+<h2>概要<a class="headerlink" href="#id1" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>Goのサーバーでは、要求されたリクエストはそれぞれのゴルーチンで処理されます。リクエストハンドラーは多くの場合、データベースやgRPCサーバといったバックエンドにアクセスするために、新しいゴルーチンを作成します。通常、リクエストを処理するゴルーチンのセットは、エンドユーザーを識別するID、認証トークン、リクエストの期限といったリクエスト固有の値にアクセスする必要があります。リクエストがキャンセルまたはタイムアウトになった場合、そのリクエストに紐付いて動いているゴルーチンはすぐに終了し、システムが使用中のリソースを回収できるようになります。</p>
+<p>Googleでは、APIの境界を越えて、リクエストの処理に関係するすべてのゴルーチンに、リクエストスコープの値、キャンセルシグナル、および期限を簡単に渡すことができる <code class="docutils literal notranslate"><span class="pre">context</span></code> パッケージを開発しました。パッケージは、 <code class="docutils literal notranslate"><span class="pre">context</span></code> として公開されています。この記事では、パッケージの使用方法について説明し、そのままで動作する実例を提供します。</p>
+</div>
+<div class="section" id="context">
+<h2>Context<a class="headerlink" href="#context" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">context</span></code> パッケージの中核は、 <code class="docutils literal notranslate"><span class="pre">Context</span></code> 型です。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// A Context carries a deadline, cancelation signal, and request-scoped values</span>
+<span class="c1">// across API boundaries. Its methods are safe for simultaneous use by multiple</span>
+<span class="c1">// goroutines.</span>
+<span class="kd">type</span> <span class="nx">Context</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="c1">// Done returns a channel that is closed when this Context is canceled</span>
+    <span class="c1">// or times out.</span>
+    <span class="nx">Done</span><span class="p">()</span> <span class="o">&lt;-</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}</span>
+
+    <span class="c1">// Err indicates why this context was canceled, after the Done channel</span>
+    <span class="c1">// is closed.</span>
+    <span class="nx">Err</span><span class="p">()</span> <span class="kt">error</span>
+
+    <span class="c1">// Deadline returns the time when this Context will be canceled, if any.</span>
+    <span class="nx">Deadline</span><span class="p">()</span> <span class="p">(</span><span class="nx">deadline</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span><span class="p">,</span> <span class="nx">ok</span> <span class="kt">bool</span><span class="p">)</span>
+
+    <span class="c1">// Value returns the value associated with key or nil if none.</span>
+    <span class="nx">Value</span><span class="p">(</span><span class="nx">key</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kd">interface</span><span class="p">{}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>(上記の説明は、GoDocの抜粋です)</p>
+<p><code class="docutils literal notranslate"><span class="pre">Done</span></code> メソッドは <code class="docutils literal notranslate"><span class="pre">Context</span></code> に代わって、実行されている関数にキャンセルのシグナルとして機能するチャネルを返します。チャネルが閉じられると、関数は処理を中止して終了します。<code class="docutils literal notranslate"><span class="pre">Err</span></code> メソッドは、<code class="docutils literal notranslate"><span class="pre">Context</span></code> がキャンセルされた理由を示すエラーを返します。「Pipelines and Cancelation」の記事では、<code class="docutils literal notranslate"><span class="pre">Done</span></code> チャンネルのイディオムについて詳しく説明しています。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Done</span></code> チャネルが受信専用であることと同じ理由で、<code class="docutils literal notranslate"><span class="pre">Context</span></code> は <code class="docutils literal notranslate"><span class="pre">Cancel</span></code> メソッドが <cite>ありません</cite> 。通常の場合、キャンセルシグナルを受信する関数はシグナルを送信する関数ではありません。特に親の操作が子の操作としてゴルーチンを開始する場合、子の操作は親をキャンセルできないようにすべきです。代わりに <code class="docutils literal notranslate"><span class="pre">WithCancel</span></code> 関数(後ほど説明)はキャンセルするための <code class="docutils literal notranslate"><span class="pre">Context</span></code> の値を提供します。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Context</span></code> は、複数のゴルーチンで同時に使用しても安全です。コードは1つの <code class="docutils literal notranslate"><span class="pre">Context</span></code> を任意の数のゴルーチンに渡し、その <code class="docutils literal notranslate"><span class="pre">Context</span></code> をキャンセルしてすべてのゴルーチンを通知できます。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Deadline</span></code> メソッドを使用すると、関数で処理を開始するかどうかを決定できます。あまりにも短い時間しか残っていない場合、処理する価値がないかもしれません。コードは期限を用いて、I/O操作のタイムアウトを設定することもできます。</p>
+<p><code class="docutils literal notranslate"><span class="pre">Value</span></code> を使用すると <code class="docutils literal notranslate"><span class="pre">Context</span></code> でリクエストスコープのデータを伝送できます。そのデータは、複数のゴルーチンによる同時使用に対して安全でなければなりません。</p>
+<div class="section" id="derived-contexts">
+<h3>** Derived contexts<a class="headerlink" href="#derived-contexts" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p>The <cite>context</cite> package provides functions to _derive_ new <cite>Context</cite> values from
+existing ones.
+These values form a tree: when a <cite>Context</cite> is canceled, all <cite>Contexts</cite> derived
+from it are also canceled.</p>
+<p><cite>Background</cite> is the root of any <cite>Context</cite> tree; it is never canceled:</p>
+<p>.code context/interface.go /Background returns/,/func Background/</p>
+<p><cite>WithCancel</cite> and <cite>WithTimeout</cite> return derived <cite>Context</cite> values that can be
+canceled sooner than the parent <cite>Context</cite>.
+The <cite>Context</cite> associated with an incoming request is typically canceled when the
+request handler returns.
+<cite>WithCancel</cite> is also useful for canceling redundant requests when using multiple
+replicas.
+<cite>WithTimeout</cite> is useful for setting a deadline on requests to backend servers:</p>
+<p>.code context/interface.go /WithCancel/,/func WithTimeout/</p>
+<p><cite>WithValue</cite> provides a way to associate request-scoped values with a <cite>Context</cite>:</p>
+<p>.code context/interface.go /WithValue/,/func WithValue/</p>
+<p>The best way to see how to use the <cite>context</cite> package is through a worked
+example.</p>
+<ul class="simple">
+<li><p>Example: Google Web Search</p></li>
+</ul>
+<hr class="docutils" />
+<p>Our example is an HTTP server that handles URLs like
+<cite>/search?q=golang&amp;timeout=1s</cite> by forwarding the query &quot;golang&quot; to the
+[[<a class="reference external" href="https://developers.google.com/web-search/docs/][Google">https://developers.google.com/web-search/docs/][Google</a> Web Search API]] and
+rendering the results.
+The <cite>timeout</cite> parameter tells the server to cancel the request after that
+duration elapses.</p>
+<p>The code is split across three packages:</p>
+<ul class="simple">
+<li><p>[[context/server/server.go][server]] provides the <cite>main</cite> function and the handler for <cite>/search</cite>.</p></li>
+<li><p>[[context/userip/userip.go][userip]] provides functions for extracting a user IP address from a request and associating it with a <cite>Context</cite>.</p></li>
+<li><p>[[context/google/google.go][google]] provides the <cite>Search</cite> function for sending a query to Google.</p></li>
+</ul>
+</div>
+<div class="section" id="the-server-program">
+<h3>** The server program<a class="headerlink" href="#the-server-program" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p>The [[context/server/server.go][server]] program handles requests like
+<cite>/search?q=golang</cite> by serving the first few Google search results for <cite>golang</cite>.
+It registers <cite>handleSearch</cite> to handle the <cite>/search</cite> endpoint.
+The handler creates an initial <cite>Context</cite> called <cite>ctx</cite> and arranges for it to be
+canceled when the handler returns.
+If the request includes the <cite>timeout</cite> URL parameter, the <cite>Context</cite> is canceled
+automatically when the timeout elapses:</p>
+<p>.code context/server/server.go /func handleSearch/,/defer cancel/</p>
+<p>The handler extracts the query from the request and extracts the client's IP
+address by calling on the <cite>userip</cite> package.
+The client's IP address is needed for backend requests, so <cite>handleSearch</cite>
+attaches it to <cite>ctx</cite>:</p>
+<p>.code context/server/server.go /Check the search query/,/userip.NewContext/</p>
+<p>The handler calls <cite>google.Search</cite> with <cite>ctx</cite> and the <cite>query</cite>:</p>
+<p>.code context/server/server.go /Run the Google search/,/elapsed/</p>
+<p>If the search succeeds, the handler renders the results:</p>
+<p>.code context/server/server.go /resultsTemplate/,/}$/</p>
+</div>
+<div class="section" id="package-userip">
+<h3>** Package userip<a class="headerlink" href="#package-userip" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p>The [[context/userip/userip.go][userip]] package provides functions for
+extracting a user IP address from a request and associating it with a <cite>Context</cite>.
+A <cite>Context</cite> provides a key-value mapping, where the keys and values are both of
+type <cite>interface{}</cite>.
+Key types must support equality, and values must be safe for simultaneous use by
+multiple goroutines.
+Packages like <cite>userip</cite> hide the details of this mapping and provide
+strongly-typed access to a specific <cite>Context</cite> value.</p>
+<p>To avoid key collisions, <cite>userip</cite> defines an unexported type <cite>key</cite> and uses
+a value of this type as the context key:</p>
+<p>.code context/userip/userip.go /The key type/,/const userIPKey/</p>
+<p><cite>FromRequest</cite> extracts a <cite>userIP</cite> value from an <cite>http.Request</cite>:</p>
+<p>.code context/userip/userip.go /func FromRequest/,/}/</p>
+<p><cite>NewContext</cite> returns a new <cite>Context</cite> that carries a provided <cite>userIP</cite> value:</p>
+<p>.code context/userip/userip.go /func NewContext/,/}/</p>
+<p><cite>FromContext</cite> extracts a <cite>userIP</cite> from a <cite>Context</cite>:</p>
+<p>.code context/userip/userip.go /func FromContext/,/}/</p>
+</div>
+<div class="section" id="package-google">
+<h3>** Package google<a class="headerlink" href="#package-google" title="このヘッドラインへのパーマリンク">¶</a></h3>
+<p>The [[context/google/google.go][google.Search]] function makes an HTTP request
+to the [[<a class="reference external" href="https://developers.google.com/web-search/docs/][Google">https://developers.google.com/web-search/docs/][Google</a> Web Search API]]
+and parses the JSON-encoded result.
+It accepts a <cite>Context</cite> parameter <cite>ctx</cite> and returns immediately if <cite>ctx.Done</cite> is
+closed while the request is in flight.</p>
+<p>The Google Web Search API request includes the search query and the user IP as
+query parameters:</p>
+<p>.code context/google/google.go /func Search/,/q.Encode/</p>
+<p><cite>Search</cite> uses a helper function, <cite>httpDo</cite>, to issue the HTTP request and cancel
+it if <cite>ctx.Done</cite> is closed while the request or response is being processed.
+<cite>Search</cite> passes a closure to <cite>httpDo</cite> handle the HTTP response:</p>
+<p>.code context/google/google.go /var results/,/return results/</p>
+<p>The <cite>httpDo</cite> function runs the HTTP request and processes its response in a new
+goroutine.
+It cancels the request if <cite>ctx.Done</cite> is closed before the goroutine exits:</p>
+<p>.code context/google/google.go /func httpDo/,/^}/</p>
+<ul class="simple">
+<li><p>Adapting code for Contexts</p></li>
+</ul>
+<hr class="docutils" />
+<p>Many server frameworks provide packages and types for carrying request-scoped
+values.
+We can define new implementations of the <cite>Context</cite> interface to bridge between
+code using existing frameworks and code that expects a <cite>Context</cite> parameter.</p>
+<p>For example, Gorilla's
+[[<a class="reference external" href="http://www.gorillatoolkit.org/pkg/context][github.com/gorilla/context">http://www.gorillatoolkit.org/pkg/context][github.com/gorilla/context</a>]]
+package allows handlers to associate data with incoming requests by providing a
+mapping from HTTP requests to key-value pairs.
+In [[context/gorilla/gorilla.go][gorilla.go]], we provide a <cite>Context</cite>
+implementation whose <cite>Value</cite> method returns the values associated with a
+specific HTTP request in the Gorilla package.</p>
+<p>Other packages have provided cancelation support similar to <cite>Context</cite>.
+For example, [[<a class="reference external" href="https://godoc.org/gopkg.in/tomb.v2][Tomb">https://godoc.org/gopkg.in/tomb.v2][Tomb</a>]] provides a <cite>Kill</cite>
+method that signals cancelation by closing a <cite>Dying</cite> channel.
+<cite>Tomb</cite> also provides methods to wait for those goroutines to exit, similar to
+<cite>sync.WaitGroup</cite>.
+In [[context/tomb/tomb.go][tomb.go]], we provide a <cite>Context</cite> implementation that
+is canceled when either its parent <cite>Context</cite> is canceled or a provided <cite>Tomb</cite> is
+killed.</p>
+<ul class="simple">
+<li><p>Conclusion</p></li>
+</ul>
+<hr class="docutils" />
+<p>At Google, we require that Go programmers pass a <cite>Context</cite> parameter as the
+first argument to every function on the call path between incoming and outgoing
+requests.
+This allows Go code developed by many different teams to interoperate well.
+It provides simple control over timeouts and cancelation and ensures that
+critical values like security credentials transit Go programs properly.</p>
+<p>Server frameworks that want to build on <cite>Context</cite> should provide implementations
+of <cite>Context</cite> to bridge between their packages and those that expect a <cite>Context</cite>
+parameter.
+Their client libraries would then accept a <cite>Context</cite> from the calling code.
+By establishing a common interface for request-scoped data and cancelation,
+<cite>Context</cite> makes it easier for package developers to share code for creating
+scalable services.</p>
+</div>
+</div>
 </div>
 
 
