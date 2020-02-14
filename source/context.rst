@@ -37,183 +37,281 @@ Context
 
 (上記の説明は、GoDocの抜粋です)
 
-``Done`` メソッドは ``Context`` に代わって、実行されている関数にキャンセルのシグナルとして機能するチャネルを返します。チャネルが閉じられると、関数は処理を中止して終了します。``Err`` メソッドは、``Context`` がキャンセルされた理由を示すエラーを返します。「Pipelines and Cancelation」の記事では、``Done`` チャンネルのイディオムについて詳しく説明しています。
+``Done`` メソッドは ``Context`` に代わって、実行されている関数にキャンセルのシグナルとして機能するチャネルを返します。チャネルが閉じられると、関数は処理を中止して終了します。``Err`` メソッドは、``Context`` がキャンセルされた理由を示すエラーを返します。「Pipelines and Cancelation」の記事では、``Done`` チャネルのイディオムについて詳しく説明しています。
 
 ``Done`` チャネルが受信専用であることと同じ理由で、``Context`` は ``Cancel`` メソッドが `ありません` 。通常の場合、キャンセルシグナルを受信する関数はシグナルを送信する関数ではありません。特に親の操作が子の操作としてゴルーチンを開始する場合、子の操作は親をキャンセルできないようにすべきです。代わりに ``WithCancel`` 関数(後ほど説明)はキャンセルするための ``Context`` の値を提供します。
 
 ``Context`` は、複数のゴルーチンで同時に使用しても安全です。コードは1つの ``Context`` を任意の数のゴルーチンに渡し、その ``Context`` をキャンセルしてすべてのゴルーチンを通知できます。
 
-``Deadline`` メソッドを使用すると、関数で処理を開始するかどうかを決定できます。あまりにも短い時間しか残っていない場合、処理する価値がないかもしれません。コードは期限を用いて、I/O操作のタイムアウトを設定することもできます。
+``Deadline`` メソッドを使用すると、関数で処理を開始するかどうかを決定できます。期限までほとんど時間がない場合、処理する価値がないかもしれません。コードはを用いて、I/O操作のタイムアウトを設定することもできます。
 
-``Value`` を使用すると ``Context`` でリクエストスコープのデータを伝送できます。そのデータは、複数のゴルーチンによる同時使用に対して安全でなければなりません。
+``Value`` を使用すると ``Context`` でリクエストスコープのデータを送ることができます。そのデータは、複数のゴルーチンによる同時使用に対して安全でなければなりません。
 
-** Derived contexts
+コンテキストの派生
 -----------------------------------------
 
-The `context` package provides functions to _derive_ new `Context` values from
-existing ones.
-These values form a tree: when a `Context` is canceled, all `Contexts` derived
-from it are also canceled.
+``context`` パッケージは元のコンテキストから新しい ``Context`` の値を生成する関数を提供しています。コンテキストは木を形成します。根の ``Context`` がキャンセルされると、そこから派生したすべての ``Context`` もキャンセルされます。
 
-`Background` is the root of any `Context` tree; it is never canceled:
+``Background`` は ``Context`` の木の根になります。キャンセルされることはありません。
 
-.code context/interface.go /Background returns/,/func Background/
+.. code-block:: go
 
-`WithCancel` and `WithTimeout` return derived `Context` values that can be
-canceled sooner than the parent `Context`.
-The `Context` associated with an incoming request is typically canceled when the
-request handler returns.
-`WithCancel` is also useful for canceling redundant requests when using multiple
-replicas.
-`WithTimeout` is useful for setting a deadline on requests to backend servers:
+    // Background returns an empty Context. It is never canceled, has no deadline,
+    // and has no values. Background is typically used in main, init, and tests,
+    // and as the top-level Context for incoming requests.
+    func Background() Context
 
-.code context/interface.go /WithCancel/,/func WithTimeout/
+``WithCancel`` と ``WithTimeout`` は派生した ``Context`` の値を返し、それらは親の ``Context`` よりも早くキャンセルできます。通常 ``Context`` はリクエストに関連する ``Context`` はリクエストハンドラが返却されるとキャンセルされます。
 
-`WithValue` provides a way to associate request-scoped values with a `Context`:
+.. todo::
 
-.code context/interface.go /WithValue/,/func WithValue/
+    ちょっと違和感がある。
 
-The best way to see how to use the `context` package is through a worked
-example.
+    The ``Context`` associated with an incoming request is typically canceled when the request handler returns.
 
-* Example: Google Web Search
+``WithCancel`` は複数のレプリカを使用しているときに、冗長なリクエストをキャンセルする場合にも役に立ちます。``WithTimeout`` はバックエンドサーバへのリクエストに期限を設定するのに役立ちます。
+
+.. code-block:: go
+
+    // WithCancel returns a copy of parent whose Done channel is closed as soon as
+    // parent.Done is closed or cancel is called.
+    func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
+
+    // A CancelFunc cancels a Context.
+    type CancelFunc func()
+
+    // WithTimeout returns a copy of parent whose Done channel is closed as soon as
+    // parent.Done is closed, cancel is called, or timeout elapses. The new
+    // Context's Deadline is the sooner of now+timeout and the parent's deadline, if
+    // any. If the timer is still running, the cancel function releases its
+    // resources.
+    func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
+
+``WithValue`` はリクエストスコープの値を ``Context`` に関連付ける方法を提供します。
+
+.. code-block:: go
+
+    // WithValue returns a copy of parent whose Value method returns val for key.
+    func WithValue(parent Context, key interface{}, val interface{}) Context
+
+``Context`` の使用方法を知る最善の方法は、実際の例を使用することです。
+
+例: GoogleのWeb検索
 =========================================
 
-Our example is an HTTP server that handles URLs like
-`/search?q=golang&timeout=1s` by forwarding the query "golang" to the
-[[https://developers.google.com/web-search/docs/][Google Web Search API]] and
-rendering the results.
-The `timeout` parameter tells the server to cancel the request after that
-duration elapses.
+「golang」を検索するクエリを `Google Web Search API <[https://developers.google.com/web-search/docs/>`_ に投げ、結果をレンダリングする ``/search?q=golang&timeout=1s`` のようなURLを扱うHTTPサーバの例を見てみましょう。``timeout`` パラメータはその期間が経過した後にリクエストをキャンセルするようにサーバーに指示します。
 
-The code is split across three packages:
+コードは以下の3つのパッケージに分かれます。
 
-- [[context/server/server.go][server]] provides the `main` function and the handler for `/search`.
-- [[context/userip/userip.go][userip]] provides functions for extracting a user IP address from a request and associating it with a `Context`.
-- [[context/google/google.go][google]] provides the `Search` function for sending a query to Google.
+- `server <https://blog.golang.org/context/server/server.go>`_ はメイン関数と ``/search`` を扱うハンドラを提供します。
+- `userip <https://blog.golang.org/context/userip/userip.go>`_ はリクエストからユーザーIPアドレスを抽出し、それを ``Context`` に関連付ける機能を提供します。
+- `google <https://blog.golang.org/context/google/google.go>`_ はクエリをGoogleに送信するための ``検索`` 機能を提供します。
 
-** The server program
+サーバープログラム
 -----------------------------------------
 
-The [[context/server/server.go][server]] program handles requests like
-`/search?q=golang` by serving the first few Google search results for `golang`.
-It registers `handleSearch` to handle the `/search` endpoint.
-The handler creates an initial `Context` called `ctx` and arranges for it to be
-canceled when the handler returns.
-If the request includes the `timeout` URL parameter, the `Context` is canceled
-automatically when the timeout elapses:
+`サーバー <https://blog.golang.org/context/server/server.go>`_ プログラムは ``golang`` の最初のいくつかのGoogle検索結果を提供することにより、``/search?q=golang`` などのリクエストを処理します。``handlesearch`` を ``/search`` エンドポイントに登録します。ハンドラは ``ctx`` という起点になる ``Context`` を作成し、ハンドラが戻ったときにキャンセルされるように調整します。リクエストに ``timeout`` のクエリパラメーターが含まれている場合、タイムアウトが経過するとコンテキストは自動的にキャンセルされます。
 
-.code context/server/server.go /func handleSearch/,/defer cancel/
+.. code-block:: go
 
-The handler extracts the query from the request and extracts the client's IP
-address by calling on the `userip` package.
-The client's IP address is needed for backend requests, so `handleSearch`
-attaches it to `ctx`:
+    func handleSearch(w http.ResponseWriter, req *http.Request) {
+        // ctx is the Context for this handler. Calling cancel closes the
+        // ctx.Done channel, which is the cancellation signal for requests
+        // started by this handler.
+        var (
+            ctx    context.Context
+            cancel context.CancelFunc
+        )
+        timeout, err := time.ParseDuration(req.FormValue("timeout"))
+        if err == nil {
+            // The request has a timeout, so create a context that is
+            // canceled automatically when the timeout expires.
+            ctx, cancel = context.WithTimeout(context.Background(), timeout)
+        } else {
+            ctx, cancel = context.WithCancel(context.Background())
+        }
+        defer cancel() // Cancel ctx as soon as handleSearch returns.
 
-.code context/server/server.go /Check the search query/,/userip.NewContext/
+ハンドラーは、リクエストからクエリを抽出し ``userip`` パッケージを呼び出してクライアントのIPアドレスを抽出します。クライアントのIPアドレスはバックエンドへのリクエストに必要であるため ``handleSearch`` はIPアドレスを ``ctx`` に付与します。
 
-The handler calls `google.Search` with `ctx` and the `query`:
+.. code-block:: go
 
-.code context/server/server.go /Run the Google search/,/elapsed/
+        // Check the search query.
+        query := req.FormValue("q")
+        if query == "" {
+            http.Error(w, "no query", http.StatusBadRequest)
+            return
+        }
 
-If the search succeeds, the handler renders the results:
+        // Store the user IP in ctx for use by code in other packages.
+        userIP, err := userip.FromRequest(req)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusBadRequest)
+            return
+        }
+        ctx = userip.NewContext(ctx, userIP)
 
-.code context/server/server.go /resultsTemplate/,/}$/
+ハンドラは ``ctx`` と ``query`` を使用して ``google.Search`` を呼び出します。
 
-** Package userip
+.. code-block:: go
+
+        // Run the Google search and print the results.
+        start := time.Now()
+        results, err := google.Search(ctx, query)
+        elapsed := time.Since(start)
+
+検索が完了すると、ハンドラは検索結果をレンダリングします。
+
+.. code-block:: go
+
+        if err := resultsTemplate.Execute(w, struct {
+            Results          google.Results
+            Timeout, Elapsed time.Duration
+        }{
+            Results: results,
+            Timeout: timeout,
+            Elapsed: elapsed,
+        }); err != nil {
+            log.Print(err)
+            return
+        }
+
+useripパッケージ
 -----------------------------------------
 
-The [[context/userip/userip.go][userip]] package provides functions for
-extracting a user IP address from a request and associating it with a `Context`.
-A `Context` provides a key-value mapping, where the keys and values are both of
-type `interface{}`.
-Key types must support equality, and values must be safe for simultaneous use by
-multiple goroutines.
-Packages like `userip` hide the details of this mapping and provide
-strongly-typed access to a specific `Context` value.
+`userip <https://blog.golang.org/context/userip/userip.go>`_ パッケージは、リクエストからユーザーIPアドレスを抽出し、それを ``Context`` に関連付ける機能を提供します。``Context`` は、キーと値の両方が型 ``interface{}`` であるキーと値のマッピングを提供します。キーの型は等価性をサポートする必要があり、値は複数のゴルーチンが同時に使用しても安全でなければなりません。``userip`` などのパッケージは、このマッピングの詳細を隠し、特定の ``Context`` 値への厳密に型指定されたアクセスを提供します。
 
-To avoid key collisions, `userip` defines an unexported type `key` and uses
-a value of this type as the context key:
+キーの衝突を避けるために、``userip`` はエクスポートされていない ``key`` 型を定義し、この型の値をコンテキストのキーとして使用します。
 
-.code context/userip/userip.go /The key type/,/const userIPKey/
+.. code-block:: go
 
-`FromRequest` extracts a `userIP` value from an `http.Request`:
+    // The key type is unexported to prevent collisions with context keys defined in
+    // other packages.
+    type key int
 
-.code context/userip/userip.go /func FromRequest/,/}/
+    // userIPkey is the context key for the user IP address.  Its value of zero is
+    // arbitrary.  If this package defined other context keys, they would have
+    // different integer values.
+    const userIPKey key = 0
 
-`NewContext` returns a new `Context` that carries a provided `userIP` value:
+``FromRequest`` は ``http.Request`` から ``userIP`` の値を抽出します。
 
-.code context/userip/userip.go /func NewContext/,/}/
+.. code-block:: go
 
-`FromContext` extracts a `userIP` from a `Context`:
+    func FromRequest(req *http.Request) (net.IP, error) {
+        ip, _, err := net.SplitHostPort(req.RemoteAddr)
+        if err != nil {
+            return nil, fmt.Errorf("userip: %q is not IP:port", req.RemoteAddr)
+        }
 
-.code context/userip/userip.go /func FromContext/,/}/
+``NewContext`` は、指定された ``userIP`` 値を保持する新しい ``Context`` を返します。
 
-** Package google
+.. code-block:: go
+
+    func NewContext(ctx context.Context, userIP net.IP) context.Context {
+        return context.WithValue(ctx, userIPKey, userIP)
+    }
+
+``FromContext`` は ``Context`` から ``userIP`` を抽出します。
+
+.. code-block:: go
+
+    func FromContext(ctx context.Context) (net.IP, bool) {
+        // ctx.Value returns nil if ctx has no value for the key;
+        // the net.IP type assertion returns ok=false for nil.
+        userIP, ok := ctx.Value(userIPKey).(net.IP)
+        return userIP, ok
+    }
+
+googleパッケージ
 -----------------------------------------
 
-The [[context/google/google.go][google.Search]] function makes an HTTP request
-to the [[https://developers.google.com/web-search/docs/][Google Web Search API]]
-and parses the JSON-encoded result.
-It accepts a `Context` parameter `ctx` and returns immediately if `ctx.Done` is
-closed while the request is in flight.
+`google.Search <https://blog.golang.org/context/google/google.go>`_ 関数は `Google Web Search API <https://developers.google.com/web-search/docs/>`_ へのHTTPリクエストを作成し、JSONエンコードされた結果を解析します。``Context`` パラメータ ``ctx`` を受け取り、リクエストの実行中に ``ctx.Done`` が閉じられるとすぐに戻ります。
 
-The Google Web Search API request includes the search query and the user IP as
-query parameters:
+Google Web Search APIリクエストには、クエリパラメータとして検索クエリとユーザーIPが含まれます。
 
-.code context/google/google.go /func Search/,/q.Encode/
+.. code-block:: go
 
-`Search` uses a helper function, `httpDo`, to issue the HTTP request and cancel
-it if `ctx.Done` is closed while the request or response is being processed.
-`Search` passes a closure to `httpDo` handle the HTTP response:
+    func Search(ctx context.Context, query string) (Results, error) {
+        // Prepare the Google Search API request.
+        req, err := http.NewRequest("GET", "https://ajax.googleapis.com/ajax/services/search/web?v=1.0", nil)
+        if err != nil {
+            return nil, err
+        }
+        q := req.URL.Query()
+        q.Set("q", query)
 
-.code context/google/google.go /var results/,/return results/
+        // If ctx is carrying the user IP address, forward it to the server.
+        // Google APIs use the user IP to distinguish server-initiated requests
+        // from end-user requests.
+        if userIP, ok := userip.FromContext(ctx); ok {
+            q.Set("userip", userIP.String())
+        }
+        req.URL.RawQuery = q.Encode()
 
-The `httpDo` function runs the HTTP request and processes its response in a new
-goroutine.
-It cancels the request if `ctx.Done` is closed before the goroutine exits:
+``Search`` では、ヘルパー関数 ``httpDo`` を使用してHTTPリクエストを発行し、リクエストまたはレスポンスの処理中に ``ctx.Done`` が閉じられた場合、キャンセルします。``Search`` は ``httpDo`` にクロージャーを渡し、HTTPレスポンスを処理します。
 
-.code context/google/google.go /func httpDo/,/^}/
+.. code-block:: go
 
-* Adapting code for Contexts
+        var results Results
+        err = httpDo(ctx, req, func(resp *http.Response, err error) error {
+            if err != nil {
+                return err
+            }
+            defer resp.Body.Close()
+
+            // Parse the JSON search result.
+            // https://developers.google.com/web-search/docs/#fonje
+            var data struct {
+                ResponseData struct {
+                    Results []struct {
+                        TitleNoFormatting string
+                        URL               string
+                    }
+                }
+            }
+            if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+                return err
+            }
+            for _, res := range data.ResponseData.Results {
+                results = append(results, Result{Title: res.TitleNoFormatting, URL: res.URL})
+            }
+            return nil
+        })
+        // httpDo waits for the closure we provided to return, so it's safe to
+        // read results here.
+        return results, err
+
+``httpDo``関数はHTTPリクエストを実行し、そのレスポンスを新しいゴルーチンで処理します。ゴルーチンが終了する前に ``ctx.Done`` が閉じられると、リクエストをキャンセルします。
+
+.. code-block:: go
+
+    func httpDo(ctx context.Context, req *http.Request, f func(*http.Response, error) error) error {
+        // Run the HTTP request in a goroutine and pass the response to f.
+        c := make(chan error, 1)
+        req = req.WithContext(ctx)
+        go func() { c <- f(http.DefaultClient.Do(req)) }()
+        select {
+        case <-ctx.Done():
+            <-c // Wait for f to return.
+            return ctx.Err()
+        case err := <-c:
+            return err
+        }
+    }
+
+コンテキストに合わせたコードの適合
 =========================================
 
-Many server frameworks provide packages and types for carrying request-scoped
-values.
-We can define new implementations of the `Context` interface to bridge between
-code using existing frameworks and code that expects a `Context` parameter.
+多くのサーバーフレームワークは、リクエストスコープの値を運ぶためのパッケージと型を提供します。``Context`` インターフェースの新しい実装を定義して、既存のフレームワークを使用するコードと ``Context`` パラメーターを必要とするコードを橋渡しします。
 
-For example, Gorilla's
-[[http://www.gorillatoolkit.org/pkg/context][github.com/gorilla/context]]
-package allows handlers to associate data with incoming requests by providing a
-mapping from HTTP requests to key-value pairs.
-In [[context/gorilla/gorilla.go][gorilla.go]], we provide a `Context`
-implementation whose `Value` method returns the values associated with a
-specific HTTP request in the Gorilla package.
+例えば、Gorillaの `github.com/gorilla/context <http://www.gorillatoolkit.org/pkg/context>`_ パッケージを使用すると、ハンドラーはHTTPリクエストからキーと値のペアへのマッピングを提供することで、要求されたリクエストにデータを関連付けることができます。`gorilla.go <https://blog.golang.org/context/gorilla/gorilla.go>`_ では、ValueメソッドがGorillaパッケージの特定のHTTPリクエストに関連付けられた値を返す ``Context`` 実装を提供します。
 
-Other packages have provided cancelation support similar to `Context`.
-For example, [[https://godoc.org/gopkg.in/tomb.v2][Tomb]] provides a `Kill`
-method that signals cancelation by closing a `Dying` channel.
-`Tomb` also provides methods to wait for those goroutines to exit, similar to
-`sync.WaitGroup`.
-In [[context/tomb/tomb.go][tomb.go]], we provide a `Context` implementation that
-is canceled when either its parent `Context` is canceled or a provided `Tomb` is
-killed.
+他のパッケージは ``Context`` と同様のキャンセルサポートを提供しています。 例えば `Tomb <https://godoc.org/gopkg.in/tomb.v2>`_ は ``Dying`` チャネルを閉じることによりキャンセルを通知するKillメソッドを提供します。``Tomb`` は ``sync.WaitGroup`` と同様に、これらのゴルーチンが終了するのを待つメソッドも提供します。`tomb.go <https://blog.golang.org/context/tomb/tomb.go>`_ では、親 ``Context`` がキャンセルされるか、提供された ``Tomb`` が強制終了されるとキャンセルされる ``Context`` 実装を提供します。
 
-* Conclusion
+結論
 =========================================
 
-At Google, we require that Go programmers pass a `Context` parameter as the
-first argument to every function on the call path between incoming and outgoing
-requests.
-This allows Go code developed by many different teams to interoperate well.
-It provides simple control over timeouts and cancelation and ensures that
-critical values like security credentials transit Go programs properly.
+Googleでは、リクエストとレスポンスの間で呼び出されるすべての関数に、最初の引数として ``Context`` パラメータを渡すことを要求しています。これによりGoのコードは多くの異なるチームで相互運用できます。タイムアウトとキャンセルを簡単に制御し、またセキュリティ資格情報などの重要な値がGoのプログラム上で適切に扱われるようにします。
 
-Server frameworks that want to build on `Context` should provide implementations
-of `Context` to bridge between their packages and those that expect a `Context`
-parameter.
-Their client libraries would then accept a `Context` from the calling code.
-By establishing a common interface for request-scoped data and cancelation,
-`Context` makes it easier for package developers to share code for creating
-scalable services.
+``Context`` に用いて実装したいサーバーフレームワークは、フレームワークと ``Context`` パラメーターを期待するパッケージとの間を橋渡しする ``Context`` の実装を提供する必要があります。クライアントライブラリは、呼び出し元のコードから ``Context`` を受け入れます。リクエストスコープのデータとキャンセル用の共通インターフェースを構築することにより、``Context`` はパッケージ開発者がスケーラブルなサービスを作成するためのコードを簡単に共有できるようにします。
