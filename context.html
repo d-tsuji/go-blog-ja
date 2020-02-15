@@ -15,8 +15,8 @@
     <script src="_static/translations.js"></script>
     <link rel="index" title="索引" href="genindex.html" />
     <link rel="search" title="検索" href="search.html" />
-    <link rel="next" title="TODO(内部用)" href="todo.html" />
-    <link rel="prev" title="Go Slices: usage and internals" href="slices_usage_and_internals.html" />
+    <link rel="next" title="Arrays, slices (and strings): The mechanics of &#39;append&#39;" href="slices.html" />
+    <link rel="prev" title="The Go Blog" href="index.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -35,6 +35,11 @@
             
   <a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><div class="section" id="go-concurrency-patterns-context">
 <h1>Go Concurrency Patterns: Context<a class="headerlink" href="#go-concurrency-patterns-context" title="このヘッドラインへのパーマリンク">¶</a></h1>
+<p>Go Concurrency Patterns: Context
+29 Jul 2014
+Tags: concurrency, cancelation, cancellation, context</p>
+<p>Sameer Ajmani</p>
+<hr class="docutils" />
 <div class="section" id="id1">
 <h2>概要<a class="headerlink" href="#id1" title="このヘッドラインへのパーマリンク">¶</a></h2>
 <p>Goのサーバーでは、要求されたリクエストはそれぞれのゴルーチンで処理されます。リクエストハンドラーは多くの場合、データベースやgRPCサーバといったバックエンドにアクセスするために、新しいゴルーチンを作成します。通常、リクエストを処理するゴルーチンのセットは、エンドユーザーを識別するID、認証トークン、リクエストの期限といったリクエスト固有の値にアクセスする必要があります。リクエストがキャンセルまたはタイムアウトになった場合、そのリクエストに紐付いて動いているゴルーチンはすぐに終了し、システムが使用中のリソースを回収できるようになります。</p>
@@ -310,8 +315,9 @@
         <div class="sphinxsidebarwrapper"><div id="toc" class="sidebarRow">
     <h5><a href="index.html">The Go Blog</a></h5>
     <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="slices_usage_and_internals.html">Go Slices: usage and internals</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Go Concurrency Patterns: Context</a></li>
+<li class="toctree-l1"><a class="reference internal" href="slices.html">Arrays, slices (and strings): The mechanics of 'append'</a></li>
+<li class="toctree-l1"><a class="reference internal" href="slices_usage_and_internals.html">Go Slices: usage and internals</a></li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="todo.html">TODO(内部用)</a></li>

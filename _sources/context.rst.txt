@@ -2,6 +2,14 @@
 Go Concurrency Patterns: Context
 =========================================
 
+Go Concurrency Patterns: Context
+29 Jul 2014
+Tags: concurrency, cancelation, cancellation, context
+
+Sameer Ajmani
+
+---------
+
 概要
 =========================================
 

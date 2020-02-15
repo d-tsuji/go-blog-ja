@@ -8,8 +8,9 @@ The Go Blog
 .. toctree::
     :maxdepth: 1
 
-    slices_usage_and_internals
     context
+    slices
+    slices_usage_and_internals
 
 .. toctree::
     :maxdepth: 1

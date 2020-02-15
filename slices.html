@@ -1,0 +1,556 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>Arrays, slices (and strings): The mechanics of &#39;append&#39; &#8212; Go database/sql tutorial  ドキュメント</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="検索" href="search.html" />
+    <link rel="next" title="Go Slices: usage and internals" href="slices_usage_and_internals.html" />
+    <link rel="prev" title="Go Concurrency Patterns: Context" href="context.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><div class="section" id="arrays-slices-and-strings-the-mechanics-of-append">
+<h1>Arrays, slices (and strings): The mechanics of 'append'<a class="headerlink" href="#arrays-slices-and-strings-the-mechanics-of-append" title="このヘッドラインへのパーマリンク">¶</a></h1>
+<p>Arrays, slices (and strings): The mechanics of 'append'
+26 Sep 2013
+Tags: array, slice, string, copy, append</p>
+<p>Rob Pike</p>
+<hr class="docutils" />
+<div class="section" id="id1">
+<h2>概要<a class="headerlink" href="#id1" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>手続き型プログラミング言語の最も一般的な機能の1つは、配列の概念です。配列は単純なもののように見えますが、言語に追加する際に検討しなければならない質問がたくさんあります。</p>
+<ul class="simple">
+<li><p>固定長か可変長か</p></li>
+<li><p>大きさは型の一部かどうか</p></li>
+<li><p>多次元配列がどのように見えるか</p></li>
+<li><p>空配列はどのような意味を持つか</p></li>
+</ul>
+<p>これらの質問に対する答えは、配列が言語の単なる特徴であるか、その言語設計の中核部分であるかどうかに影響します。</p>
+<p>Goの初期の開発では、設計が正しく感じられるまでにこれらの質問に対する答えを決定するのに約1年かかりました。重要なステップは、柔軟性のある拡張可能なデータ構造を提供するために固定サイズの <em>配列</em> に基づいて構築された <em>スライス</em> の導入でした。しかし、今日に至るまで、Goを初めて使用するプログラマーは、スライスの動作方法につまずくことがよくあります。これは、おそらく他の言語の経験による先入観によるためです。</p>
+<p>この投稿では、上記のような混乱を解消することを試みます。このために、組み込み関数の <code class="docutils literal notranslate"><span class="pre">append</span></code> がどのように機能するか、なぜ機能するのかを説明します。</p>
+</div>
+<div class="section" id="id2">
+<h2>配列<a class="headerlink" href="#id2" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>配列はGoの重要な構成要素ですが、建物の基盤のように、より可視的なコンポーネントの下に隠れていることがよくあります。スライスのより興味深く、強力で、目立つアイデアに移る前に、それらについて簡単に話さなければなりません。</p>
+<p>配列のサイズはその型の一部であり、表現力を制限するため、配列はGoプログラムではあまり見られません。</p>
+<p>以下のように宣言します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">buffer</span> <span class="p">[</span><span class="mi">256</span><span class="p">]</span><span class="kt">byte</span>
+</pre></div>
+</div>
+<p>256バイトを保持する変数 <code class="docutils literal notranslate"><span class="pre">buffer</span></code> を宣言します。<code class="docutils literal notranslate"><span class="pre">buffer</span></code> の型には、そのサイズ <code class="docutils literal notranslate"><span class="pre">[256]byte</span></code> が含まれます。 512バイトの配列は、異なる型 <code class="docutils literal notranslate"><span class="pre">[512]byte</span></code> になります。</p>
+<p>配列に関連付けられているデータは、要素の配列です。概略的には、メモリ内のバッファは次のようになります。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">buffer</span><span class="p">:</span> <span class="kt">byte</span> <span class="kt">byte</span> <span class="kt">byte</span> <span class="o">...</span> <span class="mi">256</span> <span class="nx">times</span> <span class="o">...</span> <span class="kt">byte</span> <span class="kt">byte</span> <span class="kt">byte</span>
+</pre></div>
+</div>
+<p>つまり、変数は256バイトのデータを保持し、それ以外は何も保持しません。 <code class="docutils literal notranslate"><span class="pre">buffer[255]</span></code> を介して、おなじみのインデックス構文 <code class="docutils literal notranslate"><span class="pre">buffer[0]</span></code> 、<code class="docutils literal notranslate"><span class="pre">buffer[1]</span></code> などでその要素にアクセスできます。(インデックス範囲0〜255は256要素をカバーします。)この範囲外の値でバッファをインデックス付けしようとすると、プログラムがクラッシュします。</p>
+<p><code class="docutils literal notranslate"><span class="pre">len</span></code> と呼ばれる組み込み関数があり、配列またはスライスの要素数と、他のいくつかのデータ型の要素数を返します。配列の場合 <code class="docutils literal notranslate"><span class="pre">len</span></code> が返すものは明らかです。この例では <code class="docutils literal notranslate"><span class="pre">len(buffer)</span></code> は固定値256を返します。</p>
+<p>配列が使われる用途はあります。例えば、変換行列の適切に表現します。しかしGoで最も一般的な目的は、スライスのためのストレージを保持することです。</p>
+</div>
+<div class="section" id="id3">
+<h2>スライス: スライスヘッダー<a class="headerlink" href="#id3" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>スライスはよく使われますが、それらをうまく使用するには、スライスが何であり、何をするのかを正確に理解する必要があります。</p>
+<p>スライスは、スライス変数自体とは別に保存される配列の連続したセクションを記述するデータ構造です。 <em>スライスは配列ではありません</em> 。スライスは配列の一部を <em>表します</em> 。</p>
+<p>前のセクションの <code class="docutils literal notranslate"><span class="pre">buffer</span></code> 配列変数を使用して、配列を <em>スライスする</em> ことにより、要素が100～150(正確には100〜149を含む)を表すスライスを作成できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">slice</span> <span class="p">[]</span><span class="kt">byte</span> <span class="p">=</span> <span class="nx">buffer</span><span class="p">[</span><span class="mi">100</span><span class="p">:</span><span class="mi">150</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>このスニペットでは、完全な変数宣言を明示的に使用しました。変数 <code class="docutils literal notranslate"><span class="pre">slice``の型は</span> <span class="pre">``[]byte</span></code> で「バイトのスライス」と発音され <code class="docutils literal notranslate"><span class="pre">buffer</span></code> と呼ばれる配列から、要素100(含む)から150(含まない)をスライスすることによって初期化されます。より慣用的な構文は、初期化式によって設定される型を除きます。</p>
+<blockquote>
+<div><p>var slice = buffer[100:150]</p>
+</div></blockquote>
+<p>関数内では、以下の簡略した宣言を使用できます。</p>
+<blockquote>
+<div><p>slice := buffer[100:150]</p>
+</div></blockquote>
+<p>上記の slice 変数とは正確には何ですか？完全な話ではありませんが、現時点では、スライスを、長さと配列の要素へのポインタという2つの要素を持つ小さなデータ構造と考えてください。背後で次のように構築されていると考えることができます。</p>
+<blockquote>
+<div><dl class="simple">
+<dt>type sliceHeader struct {</dt><dd><p>Length        int
+ZerothElement <a href="#id4"><span class="problematic" id="id5">*</span></a>byte</p>
+</dd>
+</dl>
+<p>}</p>
+<dl class="simple">
+<dt>slice := sliceHeader{</dt><dd><p>Length:        50,
+ZerothElement: &amp;buffer[100],</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p>もちろん、これは単なる例です。このスニペットは <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> と記しているにもかかわらず、構造体はプログラマに公開されていません。要素ポインタの型は要素の型に依存しますが、これは一般的な考え方です。</p>
+<p>これまで、配列に対してスライス操作を使用しましたが、次のようにスライスをスライスすることもできます。</p>
+<blockquote>
+<div><p>slice2 := slice[5:10]</p>
+</div></blockquote>
+<p>前と同じように、この操作は新しいスライスを作成します。この場合、元のスライスの要素5～9(両端を含む)で、元の配列の要素105〜109を意味します。 <code class="docutils literal notranslate"><span class="pre">slice2</span></code> 変数の基礎となる <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> 構造体は次のようになります。</p>
+<blockquote>
+<div><dl class="simple">
+<dt>slice2 := sliceHeader{</dt><dd><p>Length:        5,
+ZerothElement: &amp;buffer[105],</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p>このヘッダーは、 <code class="docutils literal notranslate"><span class="pre">buffer</span></code> 変数に格納されている同じ基となる配列を引き続き指していることに注意してください。</p>
+<p>スライスを <em>再スライス</em> することもできます。つまり、スライスをスライスして、元のスライス構造に結果を保存します。</p>
+<blockquote>
+<div><p>slice = slice[5:10]</p>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">slice</span></code> 変数の <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> 構造は <code class="docutils literal notranslate"><span class="pre">slice2</span></code> 変数の場合と同じように見えます。スライスを切り捨てるなど、頻繁に使用される再スライスが表示されます。次のステートメントは、スライスの最初と最後の要素を削除します。</p>
+<blockquote>
+<div><p>slice = slice[1:len(slice)-1]</p>
+</div></blockquote>
+<p>[演習：この割り当て後 <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> 構造体がどのように見えるかを記述します。]</p>
+<p>経験豊富なGoプログラマーが「スライスヘッダー」について語るのをよく耳にします。これは実際にスライス変数に格納されているからです。たとえば、 <a class="reference external" href="https://golang.org/pkg/bytes/#IndexRune">bytes.IndexRune</a> など、スライスを引数として取る関数を呼び出すと、そのヘッダーが関数に渡されます。この呼び出しでは、</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slashPos</span> <span class="o">:=</span> <span class="nx">bytes</span><span class="p">.</span><span class="nx">IndexRune</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="sc">&#39;/&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">IndexRune</span></code> 関数に渡される <code class="docutils literal notranslate"><span class="pre">slice</span></code> 引数は、実際には「スライスヘッダー」です。</p>
+<p>スライスヘッダーにはもう1つのデータ項目がありますが、これについては後で説明します。最初に、スライスを使用してプログラミングするときにスライスヘッダーの存在が何を意味するかを見てみましょう。</p>
+</div>
+<div class="section" id="id6">
+<h2>スライスを関数に渡す<a class="headerlink" href="#id6" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>スライスにポインターが含まれていても、それ自体が値であることを理解することが重要です。背後では、ポインターと長さを保持する構造体の値です。構造体へのポインタでは <em>ありません</em> 。</p>
+<p>これは重要です。</p>
+<p>前の例で <code class="docutils literal notranslate"><span class="pre">IndexRune</span></code> を呼び出したときに、スライスヘッダーの <em>コピー</em> が渡されました。この動作には重要な影響があります。</p>
+<p>以下のシンプルな関数について考えてみます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">AddOneToEachElement</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">slice</span> <span class="p">{</span>
+                <span class="nx">slice</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span><span class="o">++</span>
+        <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>その名前が示すとおり、スライスのインデックスを反復処理し(forの <code class="docutils literal notranslate"><span class="pre">range</span></code> ループを使用)、要素をインクリメントします。</p>
+<p>動かしてみましょう。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">slice</span> <span class="o">:=</span> <span class="nx">buffer</span><span class="p">[</span><span class="mi">10</span><span class="p">:</span><span class="mi">20</span><span class="p">]</span>
+        <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">);</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+                <span class="nx">slice</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nb">byte</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;before&quot;</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+        <span class="nx">AddOneToEachElement</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;after&quot;</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>(気になる場合は、これらの実行可能なスニペットを編集および再実行できます。)</p>
+<p>スライス <em>ヘッダー</em> は値で渡されますが、ヘッダーには配列の要素へのポインターが含まれるため、元のスライスヘッダーと関数に渡されるヘッダーのコピーの両方が同じ配列を記述します。したがって、関数が戻ると、変更された要素は元のスライス変数を通して見ることができます。</p>
+<p>この例のように、関数の引数は実際にはコピーです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">SubtractOneFromLength</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">[]</span><span class="kt">byte</span> <span class="p">{</span>
+        <span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">0</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="nx">slice</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Before: len(slice) =&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+        <span class="nx">newSlice</span> <span class="o">:=</span> <span class="nx">SubtractOneFromLength</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;After:  len(slice) =&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;After:  len(newSlice) =&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">newSlice</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>ここでは、関数によってスライス引数の <em>内容</em> を変更できますが、 <em>ヘッダー</em> は変更できないことがわかります。<code class="docutils literal notranslate"><span class="pre">slice</span></code> 変数に格納されている長さは、関数の呼び出しによって変更されません。これは、関数には元ではなくスライスヘッダーのコピーが渡されるためです。したがって、ヘッダーを変更する関数を作成する場合は、ここで行ったように、結果パラメーターとして返す必要があります。<code class="docutils literal notranslate"><span class="pre">slice</span></code> 変数は変更されていませんが、返される値の長さは新しいため <code class="docutils literal notranslate"><span class="pre">newSlice</span></code> に保存されます。</p>
+</div>
+<div class="section" id="id7">
+<h2>スライスへのポインタ: メソッドのレシーバ<a class="headerlink" href="#id7" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>関数にスライスヘッダーを変更させる別の方法は、関数にポインターを渡すことです。これを行う前の例を少し変えた例を示します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">PtrSubtractOneFromLength</span><span class="p">(</span><span class="nx">slicePtr</span> <span class="o">*</span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">slice</span> <span class="o">:=</span> <span class="o">*</span><span class="nx">slicePtr</span>
+        <span class="o">*</span><span class="nx">slicePtr</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">0</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Before: len(slice) =&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+        <span class="nx">PtrSubtractOneFromLength</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">slice</span><span class="p">)</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;After:  len(slice) =&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>It seems clumsy in that example, especially dealing with the extra level of indirection
+(a temporary variable helps),
+but there is one common case where you see pointers to slices.
+It is idiomatic to use a pointer receiver for a method that modifies a slice.</p>
+<p>Let's say we wanted to have a method on a slice that truncates it at the final slash.
+We could write it like this:</p>
+<p>.play -edit slices/prog040.go /^type/,$</p>
+<p>If you run this example you'll see that it works properly, updating the slice in the caller.</p>
+<p>[Exercise: Change the type of the receiver to be a value rather
+than a pointer and run it again. Explain what happens.]</p>
+<p>On the other hand, if we wanted to write a method for <cite>path</cite> that upper-cases
+the ASCII letters in the path (parochially ignoring non-English names), the method could
+be a value because the value receiver will still point to the same underlying array.</p>
+<p>.play -edit slices/prog050.go /^type/,$</p>
+<p>Here the <cite>ToUpper</cite> method uses two variables in the <cite>for</cite> <cite>range</cite> construct
+to capture the index and slice element.
+This form of loop avoids writing <cite>p[i]</cite> multiple times in the body.</p>
+<p>[Exercise: Convert the <cite>ToUpper</cite> method to use a pointer receiver and see if its behavior changes.]</p>
+<p>[Advanced exercise: Convert the <cite>ToUpper</cite> method to handle Unicode letters, not just ASCII.]</p>
+<ul class="simple">
+<li><p>Capacity</p></li>
+</ul>
+<hr class="docutils" />
+<p>Look at the following function that extends its argument slice of <cite>ints</cite> by one element:</p>
+<p>.code slices/prog060.go /^func Extend/,/^}/</p>
+<p>(Why does it need to return the modified slice?) Now run it:</p>
+<p>.play -edit slices/prog060.go /^func main/,/^}/</p>
+<p>See how the slice grows until... it doesn't.</p>
+<p>It's time to talk about the third component of the slice header: its _capacity_.
+Besides the array pointer and length, the slice header also stores its capacity:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>type sliceHeader struct {</dt><dd><p>Length        int
+Capacity      int
+ZerothElement <a href="#id8"><span class="problematic" id="id9">*</span></a>byte</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p>The <cite>Capacity</cite> field records how much space the underlying array actually has; it is the maximum
+value the <cite>Length</cite> can reach.
+Trying to grow the slice beyond its capacity will step beyond the limits of the array and will trigger a panic.</p>
+<p>After our example slice is created by</p>
+<blockquote>
+<div><p>slice := iBuffer[0:0]</p>
+</div></blockquote>
+<p>its header looks like this:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>slice := sliceHeader{</dt><dd><p>Length:        0,
+Capacity:      10,
+ZerothElement: &amp;iBuffer[0],</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p>The <cite>Capacity</cite> field is equal to the length of the underlying array,
+minus the index in the array of the first element of the slice (zero in this case).
+If you want to inquire what the capacity is for a slice, use the built-in function <cite>cap</cite>:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>if cap(slice) == len(slice) {</dt><dd><p>fmt.Println(&quot;slice is full!&quot;)</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>Make</p></li>
+</ul>
+<hr class="docutils" />
+<p>What if we want to grow the slice beyond its capacity?
+You can't!
+By definition, the capacity is the limit to growth.
+But you can achieve an equivalent result by allocating a new array, copying the data over, and modifying
+the slice to describe the new array.</p>
+<p>Let's start with allocation.
+We could use the <cite>new</cite> built-in function to allocate a bigger array
+and then slice the result,
+but it is simpler to use the <cite>make</cite> built-in function instead.
+It allocates a new array and
+creates a slice header to describe it, all at once.
+The <cite>make</cite> function takes three arguments: the type of the slice, its initial length, and its capacity, which is the
+length of the array that <cite>make</cite> allocates to hold the slice data.
+This call creates a slice of length 10 with room for 5 more (15-10), as you can see by running it:</p>
+<p>.play -edit slices/prog070.go /slice/,/fmt/</p>
+<p>This snippet doubles the capacity of our <cite>int</cite> slice but keeps its length the same:</p>
+<p>.play -edit slices/prog080.go /slice/,/OMIT/</p>
+<p>After running this code the slice has much more room to grow before needing another reallocation.</p>
+<p>When creating slices, it's often true that the length and capacity will be same.
+The <cite>make</cite> built-in has a shorthand for this common case.
+The length argument defaults to the capacity, so you can leave it out
+to set them both to the same value.
+After</p>
+<blockquote>
+<div><p>gophers := make([]Gopher, 10)</p>
+</div></blockquote>
+<p>the <cite>gophers</cite> slice has both its length and capacity set to 10.</p>
+<ul class="simple">
+<li><p>Copy</p></li>
+</ul>
+<hr class="docutils" />
+<p>When we doubled the capacity of our slice in the previous section,
+we wrote a loop to copy the old data to the new slice.
+Go has a built-in function, <cite>copy</cite>, to make this easier.
+Its arguments are two slices, and it copies the data from the right-hand argument to the left-hand argument.
+Here's our example rewritten to use <cite>copy</cite>:</p>
+<p>.play -edit slices/prog090.go /newSlice/,/newSlice/</p>
+<p>The <cite>copy</cite> function is smart.
+It only copies what it can, paying attention to the lengths of both arguments.
+In other words, the number of elements it copies is the minimum of the lengths of the two slices.
+This can save a little bookkeeping.
+Also, <cite>copy</cite> returns an integer value, the number of elements it copied, although it's not always worth checking.</p>
+<p>The <cite>copy</cite> function also gets things right when source and destination overlap, which means it can be used to shift
+items around in a single slice.
+Here's how to use <cite>copy</cite> to insert a value into the middle of a slice.</p>
+<p>.code slices/prog100.go /Insert/,/^}/</p>
+<p>There are a couple of things to notice in this function.
+First, of course, it must return the updated slice because its length has changed.
+Second, it uses a convenient shorthand.
+The expression</p>
+<blockquote>
+<div><p>slice[i:]</p>
+</div></blockquote>
+<p>means exactly the same as</p>
+<blockquote>
+<div><p>slice[i:len(slice)]</p>
+</div></blockquote>
+<p>Also, although we haven't used the trick yet, we can leave out the first element of a slice expression too;
+it defaults to zero. Thus</p>
+<blockquote>
+<div><p>slice[:]</p>
+</div></blockquote>
+<p>just means the slice itself, which is useful when slicing an array.
+This expression is the shortest way to say &quot;a slice describing all the elements of the array&quot;:</p>
+<blockquote>
+<div><p>array[:]</p>
+</div></blockquote>
+<p>Now that's out of the way, let's run our <cite>Insert</cite> function.</p>
+<p>.play -edit slices/prog100.go /make/,/OMIT/</p>
+<ul class="simple">
+<li><p>Append: An example</p></li>
+</ul>
+<hr class="docutils" />
+<p>A few sections back, we wrote an <cite>Extend</cite> function that extends a slice by one element.
+It was buggy, though, because if the slice's capacity was too small, the function would
+crash.
+(Our <cite>Insert</cite> example has the same problem.)
+Now we have the pieces in place to fix that, so let's write a robust implementation of
+<cite>Extend</cite> for integer slices.</p>
+<p>.code slices/prog110.go /func Extend/,/^}/</p>
+<p>In this case it's especially important to return the slice, since when it reallocates
+the resulting slice describes a completely different array.
+Here's a little snippet to demonstrate what happens as the slice fills up:</p>
+<p>.play -edit slices/prog110.go /START/,/END/</p>
+<p>Notice the reallocation when the initial array of size 5 is filled up.
+Both the capacity and the address of the zeroth element change when the new array is allocated.</p>
+<p>With the robust <cite>Extend</cite> function as a guide we can write an even nicer function that lets
+us extend the slice by multiple elements.
+To do this, we use Go's ability to turn a list of function arguments into a slice when the
+function is called.
+That is, we use Go's variadic function facility.</p>
+<p>Let's call the function <cite>Append</cite>.
+For the first version, we can just call <cite>Extend</cite> repeatedly so the mechanism of the variadic function is clear.
+The signature of <cite>Append</cite> is this:</p>
+<blockquote>
+<div><p>func Append(slice []int, items ...int) []int</p>
+</div></blockquote>
+<p>What that says is that <cite>Append</cite> takes one argument, a slice, followed by zero or more
+<cite>int</cite> arguments.
+Those arguments are exactly a slice of <cite>int</cite> as far as the implementation
+of <cite>Append</cite> is concerned, as you can see:</p>
+<p>.code slices/prog120.go /Append/,/^}/</p>
+<p>Notice the <cite>for</cite> <cite>range</cite> loop iterating over the elements of the <cite>items</cite> argument, which has implied type <cite>[]int</cite>.
+Also notice the use of the blank identifier <cite>_</cite> to discard the index in the loop, which we don't need in this case.</p>
+<p>Try it:</p>
+<p>.play -edit slices/prog120.go /START/,/END/</p>
+<p>Another new technique in this example is that we initialize the slice by writing a composite literal,
+which consists of the type of the slice followed by its elements in braces:</p>
+<p>.code slices/prog120.go /slice := /</p>
+<p>The <cite>Append</cite> function is interesting for another reason.
+Not only can we append elements, we can append a whole second slice
+by &quot;exploding&quot; the slice into arguments using the <cite>...</cite> notation at the call site:</p>
+<p>.play -edit slices/prog130.go /START/,/END/</p>
+<p>Of course, we can make <cite>Append</cite> more efficient by allocating no more than once,
+building on the innards of <cite>Extend</cite>:</p>
+<p>.code slices/prog140.go /Append/,/^}/</p>
+<p>Here, notice how we use <cite>copy</cite> twice, once to move the slice data to the newly
+allocated memory, and then to copy the appending items to the end of the old data.</p>
+<p>Try it; the behavior is the same as before:</p>
+<p>.play -edit slices/prog140.go /START/,/END/</p>
+<ul class="simple">
+<li><p>Append: The built-in function</p></li>
+</ul>
+<hr class="docutils" />
+<p>And so we arrive at the motivation for the design of the <cite>append</cite> built-in function.
+It does exactly what our <cite>Append</cite> example does, with equivalent efficiency, but it
+works for any slice type.</p>
+<p>A weakness of Go is that any generic-type operations must be provided by the
+run-time. Some day that may change, but for now, to make working with slices
+easier, Go provides a built-in generic <cite>append</cite> function.
+It works the same as our <cite>int</cite> slice version, but for _any_ slice type.</p>
+<p>Remember, since the slice header is always updated by a call to <cite>append</cite>, you need
+to save the returned slice after the call.
+In fact, the compiler won't let you call append without saving the result.</p>
+<p>Here are some one-liners intermingled with print statements. Try them, edit them and explore:</p>
+<p>.play -edit slices/prog150.go /START/,/END/</p>
+<p>It's worth taking a moment to think about the final one-liner of that example in detail to understand
+how the design of slices makes it possible for this simple call to work correctly.</p>
+<p>There are lots more examples of <cite>append</cite>, <cite>copy</cite>, and other ways to use slices
+on the community-built
+[[<a class="reference external" href="https://golang.org/wiki/SliceTricks">https://golang.org/wiki/SliceTricks</a>][&quot;Slice Tricks&quot; Wiki page]].</p>
+<ul class="simple">
+<li><p>Nil</p></li>
+</ul>
+<hr class="docutils" />
+<p>As an aside, with our newfound knowledge we can see what the representation of a <cite>nil</cite> slice is.
+Naturally, it is the zero value of the slice header:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>sliceHeader{</dt><dd><p>Length:        0,
+Capacity:      0,
+ZerothElement: nil,</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p>or just</p>
+<blockquote>
+<div><p>sliceHeader{}</p>
+</div></blockquote>
+<p>The key detail is that the element pointer is <cite>nil</cite> too. The slice created by</p>
+<blockquote>
+<div><p>array[0:0]</p>
+</div></blockquote>
+<p>has length zero (and maybe even capacity zero) but its pointer is not <cite>nil</cite>, so
+it is not a nil slice.</p>
+<p>As should be clear, an empty slice can grow (assuming it has non-zero capacity), but a <cite>nil</cite>
+slice has no array to put values in and can never grow to hold even one element.</p>
+<p>That said, a <cite>nil</cite> slice is functionally equivalent to a zero-length slice, even though it points
+to nothing.
+It has length zero and can be appended to, with allocation.
+As an example, look at the one-liner above that copies a slice by appending
+to a <cite>nil</cite> slice.</p>
+<ul class="simple">
+<li><p>Strings</p></li>
+</ul>
+<hr class="docutils" />
+<p>Now a brief section about strings in Go in the context of slices.</p>
+<p>Strings are actually very simple: they are just read-only slices of bytes with a bit
+of extra syntactic support from the language.</p>
+<p>Because they are read-only, there is no need for a capacity (you can't grow them),
+but otherwise for most purposes you can treat them just like read-only slices
+of bytes.</p>
+<p>For starters, we can index them to access individual bytes:</p>
+<blockquote>
+<div><p>slash := &quot;/usr/ken&quot;[0] // yields the byte value '/'.</p>
+</div></blockquote>
+<p>We can slice a string to grab a substring:</p>
+<blockquote>
+<div><p>usr := &quot;/usr/ken&quot;[0:4] // yields the string &quot;/usr&quot;</p>
+</div></blockquote>
+<p>It should be obvious now what's going on behind the scenes when we slice a string.</p>
+<p>We can also take a normal slice of bytes and create a string from it with the simple conversion:</p>
+<blockquote>
+<div><p>str := string(slice)</p>
+</div></blockquote>
+<p>and go in the reverse direction as well:</p>
+<blockquote>
+<div><p>slice := []byte(usr)</p>
+</div></blockquote>
+<p>The array underlying a string is hidden from view; there is no way to access its contents
+except through the string. That means that when we do either of these conversions, a
+copy of the array must be made.
+Go takes care of this, of course, so you don't have to.
+After either of these conversions, modifications to
+the array underlying the byte slice don't affect the corresponding string.</p>
+<p>An important consequence of this slice-like design for strings is that
+creating a substring is very efficient.
+All that needs to happen
+is the creation of a two-word string header. Since the string is read-only, the original
+string and the string resulting from the slice operation can share the same array safely.</p>
+<p>A historical note: The earliest implementation of strings always allocated, but when slices
+were added to the language, they provided a model for efficient string handling. Some of
+the benchmarks saw huge speedups as a result.</p>
+<p>There's much more to strings, of course, and a
+[[<a class="reference external" href="https://blog.golang.org/strings][separate">https://blog.golang.org/strings][separate</a> blog post]] covers them in greater depth.</p>
+</div>
+<div class="section" id="id10">
+<h2>結論<a class="headerlink" href="#id10" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>To understand how slices work, it helps to understand how they are implemented.
+There is a little data structure, the slice header, that is the item associated with the slice
+variable, and that header describes a section of a separately allocated array.
+When we pass slice values around, the header gets copied but the array it points
+to is always shared.</p>
+<p>Once you appreciate how they work, slices become not only easy to use, but
+powerful and expressive, especially with the help of the <cite>copy</cite> and <cite>append</cite>
+built-in functions.</p>
+</div>
+<div class="section" id="id11">
+<h2>さらに読むために<a class="headerlink" href="#id11" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>There's lots to find around the intertubes about slices in Go.
+As mentioned earlier,
+the [[<a class="reference external" href="https://golang.org/wiki/SliceTricks">https://golang.org/wiki/SliceTricks</a>][&quot;Slice Tricks&quot; Wiki page]]
+has many examples.
+The [[<a class="reference external" href="https://blog.golang.org/go-slices-usage-and-internals][Go">https://blog.golang.org/go-slices-usage-and-internals][Go</a> Slices]] blog post
+describes the memory layout details with clear diagrams.
+Russ Cox's [[<a class="reference external" href="https://research.swtch.com/godata][Go">https://research.swtch.com/godata][Go</a> Data Structures]] article includes
+a discussion of slices along with some of Go's other internal data structures.</p>
+<p>There is much more material available, but the best way to learn about slices is to use them.</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div id="toc" class="sidebarRow">
+    <h5><a href="index.html">The Go Blog</a></h5>
+    <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="context.html">Go Concurrency Patterns: Context</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Arrays, slices (and strings): The mechanics of 'append'</a></li>
+<li class="toctree-l1"><a class="reference internal" href="slices_usage_and_internals.html">Go Slices: usage and internals</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="todo.html">TODO(内部用)</a></li>
+</ul>
+
+    
+</div>
+
+<style type="text/css">
+    .toctree-l1 {
+        font-size: 12px;
+        margin-bottom: 0;
+        font-stretch: normal;
+        font-style: normal;
+        line-height: 1.33;
+        padding-bottom: 5px;
+        margin: 2px;
+    }
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;VividCortex (translated by @d-tsuji).
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/slices.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
