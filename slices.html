@@ -79,51 +79,46 @@ Tags: array, slice, string, copy, append</p>
 </pre></div>
 </div>
 <p>このスニペットでは、完全な変数宣言を明示的に使用しました。変数 <code class="docutils literal notranslate"><span class="pre">slice``の型は</span> <span class="pre">``[]byte</span></code> で「バイトのスライス」と発音され <code class="docutils literal notranslate"><span class="pre">buffer</span></code> と呼ばれる配列から、要素100(含む)から150(含まない)をスライスすることによって初期化されます。より慣用的な構文は、初期化式によって設定される型を除きます。</p>
-<blockquote>
-<div><p>var slice = buffer[100:150]</p>
-</div></blockquote>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">slice</span> <span class="p">=</span> <span class="nx">buffer</span><span class="p">[</span><span class="mi">100</span><span class="p">:</span><span class="mi">150</span><span class="p">]</span>
+</pre></div>
+</div>
 <p>関数内では、以下の簡略した宣言を使用できます。</p>
-<blockquote>
-<div><p>slice := buffer[100:150]</p>
-</div></blockquote>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="nx">buffer</span><span class="p">[</span><span class="mi">100</span><span class="p">:</span><span class="mi">150</span><span class="p">]</span>
+</pre></div>
+</div>
 <p>上記の slice 変数とは正確には何ですか？完全な話ではありませんが、現時点では、スライスを、長さと配列の要素へのポインタという2つの要素を持つ小さなデータ構造と考えてください。背後で次のように構築されていると考えることができます。</p>
-<blockquote>
-<div><dl class="simple">
-<dt>type sliceHeader struct {</dt><dd><p>Length        int
-ZerothElement <a href="#id4"><span class="problematic" id="id5">*</span></a>byte</p>
-</dd>
-</dl>
-<p>}</p>
-<dl class="simple">
-<dt>slice := sliceHeader{</dt><dd><p>Length:        50,
-ZerothElement: &amp;buffer[100],</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">sliceHeader</span> <span class="kd">struct</span> <span class="p">{</span>
+        <span class="nx">Length</span>        <span class="kt">int</span>
+        <span class="nx">ZerothElement</span> <span class="o">*</span><span class="kt">byte</span>
+<span class="p">}</span>
+
+<span class="nx">slice</span> <span class="o">:=</span> <span class="nx">sliceHeader</span><span class="p">{</span>
+        <span class="nx">Length</span><span class="p">:</span>        <span class="mi">50</span><span class="p">,</span>
+        <span class="nx">ZerothElement</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">buffer</span><span class="p">[</span><span class="mi">100</span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
 <p>もちろん、これは単なる例です。このスニペットは <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> と記しているにもかかわらず、構造体はプログラマに公開されていません。要素ポインタの型は要素の型に依存しますが、これは一般的な考え方です。</p>
 <p>これまで、配列に対してスライス操作を使用しましたが、次のようにスライスをスライスすることもできます。</p>
-<blockquote>
-<div><p>slice2 := slice[5:10]</p>
-</div></blockquote>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice2</span> <span class="o">:=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">5</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span>
+</pre></div>
+</div>
 <p>前と同じように、この操作は新しいスライスを作成します。この場合、元のスライスの要素5～9(両端を含む)で、元の配列の要素105〜109を意味します。 <code class="docutils literal notranslate"><span class="pre">slice2</span></code> 変数の基礎となる <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> 構造体は次のようになります。</p>
-<blockquote>
-<div><dl class="simple">
-<dt>slice2 := sliceHeader{</dt><dd><p>Length:        5,
-ZerothElement: &amp;buffer[105],</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice2</span> <span class="o">:=</span> <span class="nx">sliceHeader</span><span class="p">{</span>
+        <span class="nx">Length</span><span class="p">:</span>        <span class="mi">5</span><span class="p">,</span>
+        <span class="nx">ZerothElement</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">buffer</span><span class="p">[</span><span class="mi">105</span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
 <p>このヘッダーは、 <code class="docutils literal notranslate"><span class="pre">buffer</span></code> 変数に格納されている同じ基となる配列を引き続き指していることに注意してください。</p>
 <p>スライスを <em>再スライス</em> することもできます。つまり、スライスをスライスして、元のスライス構造に結果を保存します。</p>
-<blockquote>
-<div><p>slice = slice[5:10]</p>
-</div></blockquote>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">5</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span>
+</pre></div>
+</div>
 <p><code class="docutils literal notranslate"><span class="pre">slice</span></code> 変数の <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> 構造は <code class="docutils literal notranslate"><span class="pre">slice2</span></code> 変数の場合と同じように見えます。スライスを切り捨てるなど、頻繁に使用される再スライスが表示されます。次のステートメントは、スライスの最初と最後の要素を削除します。</p>
-<blockquote>
-<div><p>slice = slice[1:len(slice)-1]</p>
-</div></blockquote>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</pre></div>
+</div>
 <p>[演習：この割り当て後 <code class="docutils literal notranslate"><span class="pre">sliceHeader</span></code> 構造体がどのように見えるかを記述します。]</p>
 <p>経験豊富なGoプログラマーが「スライスヘッダー」について語るのをよく耳にします。これは実際にスライス変数に格納されているからです。たとえば、 <a class="reference external" href="https://golang.org/pkg/bytes/#IndexRune">bytes.IndexRune</a> など、スライスを引数として取る関数を呼び出すと、そのヘッダーが関数に渡されます。この呼び出しでは、</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slashPos</span> <span class="o">:=</span> <span class="nx">bytes</span><span class="p">.</span><span class="nx">IndexRune</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="sc">&#39;/&#39;</span><span class="p">)</span>
@@ -132,8 +127,8 @@ ZerothElement: &amp;buffer[105],</p>
 <p><code class="docutils literal notranslate"><span class="pre">IndexRune</span></code> 関数に渡される <code class="docutils literal notranslate"><span class="pre">slice</span></code> 引数は、実際には「スライスヘッダー」です。</p>
 <p>スライスヘッダーにはもう1つのデータ項目がありますが、これについては後で説明します。最初に、スライスを使用してプログラミングするときにスライスヘッダーの存在が何を意味するかを見てみましょう。</p>
 </div>
-<div class="section" id="id6">
-<h2>スライスを関数に渡す<a class="headerlink" href="#id6" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<div class="section" id="id4">
+<h2>スライスを関数に渡す<a class="headerlink" href="#id4" title="このヘッドラインへのパーマリンク">¶</a></h2>
 <p>スライスにポインターが含まれていても、それ自体が値であることを理解することが重要です。背後では、ポインターと長さを保持する構造体の値です。構造体へのポインタでは <em>ありません</em> 。</p>
 <p>これは重要です。</p>
 <p>前の例で <code class="docutils literal notranslate"><span class="pre">IndexRune</span></code> を呼び出したときに、スライスヘッダーの <em>コピー</em> が渡されました。この動作には重要な影響があります。</p>
@@ -176,8 +171,8 @@ ZerothElement: &amp;buffer[105],</p>
 </div>
 <p>ここでは、関数によってスライス引数の <em>内容</em> を変更できますが、 <em>ヘッダー</em> は変更できないことがわかります。<code class="docutils literal notranslate"><span class="pre">slice</span></code> 変数に格納されている長さは、関数の呼び出しによって変更されません。これは、関数には元ではなくスライスヘッダーのコピーが渡されるためです。したがって、ヘッダーを変更する関数を作成する場合は、ここで行ったように、結果パラメーターとして返す必要があります。<code class="docutils literal notranslate"><span class="pre">slice</span></code> 変数は変更されていませんが、返される値の長さは新しいため <code class="docutils literal notranslate"><span class="pre">newSlice</span></code> に保存されます。</p>
 </div>
-<div class="section" id="id7">
-<h2>スライスへのポインタ: メソッドのレシーバ<a class="headerlink" href="#id7" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<div class="section" id="id5">
+<h2>スライスへのポインタ: メソッドのレシーバ<a class="headerlink" href="#id5" title="このヘッドラインへのパーマリンク">¶</a></h2>
 <p>関数にスライスヘッダーを変更させる別の方法は、関数にポインターを渡すことです。これを行う前の例を少し変えた例を示します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">PtrSubtractOneFromLength</span><span class="p">(</span><span class="nx">slicePtr</span> <span class="o">*</span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">{</span>
         <span class="nx">slice</span> <span class="o">:=</span> <span class="o">*</span><span class="nx">slicePtr</span>
@@ -225,7 +220,7 @@ Besides the array pointer and length, the slice header also stores its capacity:
 <div><dl class="simple">
 <dt>type sliceHeader struct {</dt><dd><p>Length        int
 Capacity      int
-ZerothElement <a href="#id8"><span class="problematic" id="id9">*</span></a>byte</p>
+ZerothElement <a href="#id6"><span class="problematic" id="id7">*</span></a>byte</p>
 </dd>
 </dl>
 <p>}</p>
@@ -478,8 +473,8 @@ the benchmarks saw huge speedups as a result.</p>
 <p>There's much more to strings, of course, and a
 [[<a class="reference external" href="https://blog.golang.org/strings][separate">https://blog.golang.org/strings][separate</a> blog post]] covers them in greater depth.</p>
 </div>
-<div class="section" id="id10">
-<h2>結論<a class="headerlink" href="#id10" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<div class="section" id="id8">
+<h2>結論<a class="headerlink" href="#id8" title="このヘッドラインへのパーマリンク">¶</a></h2>
 <p>To understand how slices work, it helps to understand how they are implemented.
 There is a little data structure, the slice header, that is the item associated with the slice
 variable, and that header describes a section of a separately allocated array.
@@ -489,8 +484,8 @@ to is always shared.</p>
 powerful and expressive, especially with the help of the <cite>copy</cite> and <cite>append</cite>
 built-in functions.</p>
 </div>
-<div class="section" id="id11">
-<h2>さらに読むために<a class="headerlink" href="#id11" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<div class="section" id="id9">
+<h2>さらに読むために<a class="headerlink" href="#id9" title="このヘッドラインへのパーマリンク">¶</a></h2>
 <p>There's lots to find around the intertubes about slices in Go.
 As mentioned earlier,
 the [[<a class="reference external" href="https://golang.org/wiki/SliceTricks">https://golang.org/wiki/SliceTricks</a>][&quot;Slice Tricks&quot; Wiki page]]
