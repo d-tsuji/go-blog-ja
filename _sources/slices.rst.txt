@@ -210,50 +210,131 @@ Goの初期の開発では、設計が正しく感じられるまでにこれら
 		fmt.Println("After:  len(slice) =", len(slice))
 	}
 
-It seems clumsy in that example, especially dealing with the extra level of indirection
-(a temporary variable helps),
-but there is one common case where you see pointers to slices.
-It is idiomatic to use a pointer receiver for a method that modifies a slice.
+上記の例では、特に余計な間接参照のレベルを扱う場合(一時的な変数が役たちます)ぎこちないように見えます。しかしスライスへのポインターを見かける一般的なケースが1つあります。スライスを変更するメソッドにポインターレシーバーを使用するのが慣用的です。
 
-Let's say we wanted to have a method on a slice that truncates it at the final slash.
-We could write it like this:
+.. todo::
 
-.play -edit slices/prog040.go /^type/,$
+	訳がわからない
 
-If you run this example you'll see that it works properly, updating the slice in the caller.
+	It seems clumsy in that example, especially dealing with the extra level of indirection (a temporary variable helps)
 
-[Exercise: Change the type of the receiver to be a value rather
-than a pointer and run it again. Explain what happens.]
+	上記の例では、特に余計な間接参照のレベルを扱う場合(一時的な変数が役たちます)ぎこちないように見えます。
 
-On the other hand, if we wanted to write a method for `path` that upper-cases
-the ASCII letters in the path (parochially ignoring non-English names), the method could
-be a value because the value receiver will still point to the same underlying array.
+最後のスラッシュで切り捨てるメソッドをスライスに持たせたいとしましょう。次のように書くことができます。
 
-.play -edit slices/prog050.go /^type/,$
+.. code-block:: go
 
-Here the `ToUpper` method uses two variables in the `for` `range` construct
-to capture the index and slice element.
-This form of loop avoids writing `p[i]` multiple times in the body.
+	type path []byte
 
-[Exercise: Convert the `ToUpper` method to use a pointer receiver and see if its behavior changes.]
+	func (p *path) TruncateAtFinalSlash() {
+		i := bytes.LastIndex(*p, []byte("/"))
+		if i >= 0 {
+			*p = (*p)[0:i]
+		}
+	}
 
-[Advanced exercise: Convert the `ToUpper` method to handle Unicode letters, not just ASCII.]
+	func main() {
+		pathName := path("/usr/bin/tso") // Conversion from string to path.
+		pathName.TruncateAtFinalSlash()
+		fmt.Printf("%s\n", pathName)
+	}
 
-* Capacity
+この例を実行すると、正しく動作し、呼び出し元のスライスを更新することがわかります。
+
+[演習：レシーバーの型をポインターではなく値に変更して、再度実行します。何が起こるかを説明してください。]
+
+.. note:: 
+
+	[訳注] レシーバの型を値にすると、呼び出したときにスライスのコピーが渡されます。関数内でスライスを切り出して別のスライスを作成したとしても ``pathName`` には影響がありません。
+
+一方、パス内のASCII文字を大文字にする(英語以外の名前を無視することで) ``path`` のメソッドを作成する場合、値のレシーバーは同じ基になる配列を指すため、メソッドは値になる可能性があります。
+
+.. code-block:: go
+
+	type path []byte
+
+	func (p path) ToUpper() {
+		for i, b := range p {
+			if 'a' <= b && b <= 'z' {
+				p[i] = b + 'A' - 'a'
+			}
+		}
+	}
+
+	func main() {
+		pathName := path("/usr/bin/tso")
+		pathName.ToUpper()
+		fmt.Printf("%s\n", pathName)
+	}
+
+ここで ``ToUpper`` メソッドは、``for`` ``range`` 構造内の2つの変数を使用して、インデックスとスライス要素をキャプチャします。この形式のループは、内で複数回 ``p[i]`` を書き込むことを避けます。
+
+[演習：``ToUpper`` メソッドを変換してポインターレシーバーを使用し、その動作が変化するかどうかを確認します。]
+
+.. note:: 
+
+	レシーバに値を渡してもポインタを渡しても動作に変化はありません。
+
+	.. code-block:: go
+
+		type path []byte
+
+		func (p *path) ToUpper() {
+			for i, b := range *p {
+				if 'a' <= b && b <= 'z' {
+					(*p)[i] = b + 'A' - 'a'
+				}
+			}
+		}
+
+		func main() {
+			pathName := path("/usr/bin/tso")
+			pathName.ToUpper()
+			fmt.Printf("%s\n", pathName)
+		}
+	
+	::
+
+		/USR/BIN/TSO
+
+		Program exited.
+
+[高度な演習：``ToUpper`` メソッドを変換して、ASCIIだけでなくUnicode文字を処理します。]
+
+容量(Capacity)
 ===============================
 
-Look at the following function that extends its argument slice of `ints` by one element:
+``ints`` の引数スライスを1つの要素だけ拡張する次の関数を見てください。
 
-.code slices/prog060.go /^func Extend/,/^}/
+.. code-block:: go
+
+	func Extend(slice []int, element int) []int {
+		n := len(slice)
+		slice = slice[0 : n+1]
+		slice[n] = element
+		return slice
+	}
+
+(変更されたスライスを返す必要があるのはなぜですか？)それを実行します：
 
 (Why does it need to return the modified slice?) Now run it:
 
-.play -edit slices/prog060.go /^func main/,/^}/
+.. code-block:: go
 
-See how the slice grows until... it doesn't.
+	func main() {
+		var iBuffer [10]int
+		slice := iBuffer[0:0]
+		for i := 0; i < 20; i++ {
+			slice = Extend(slice, i)
+			fmt.Println(slice)
+		}
+	}
 
-It's time to talk about the third component of the slice header: its _capacity_.
-Besides the array pointer and length, the slice header also stores its capacity:
+スライスがどのように成長するかを確認してください...。最後までは成長しません。
+
+スライスヘッダーの3番目のコンポーネントである容量について説明します。配列へのポインタと長さに加えて、スライスヘッダーにはその *容量* も格納されます。
+
+.. code-block:: go
 
 	type sliceHeader struct {
 		Length        int
@@ -261,15 +342,17 @@ Besides the array pointer and length, the slice header also stores its capacity:
 		ZerothElement *byte
 	}
 
-The `Capacity` field records how much space the underlying array actually has; it is the maximum
-value the `Length` can reach.
-Trying to grow the slice beyond its capacity will step beyond the limits of the array and will trigger a panic.
+``Capacity`` フィールドには、基になる配列に実際にどのくらいのスペースがあるかが記録されます。これは ``Length`` が到達できる最大値です。スライスをその容量を超えて拡大しようとすると、配列の制限を超えてパニックを引き起こします。
 
-After our example slice is created by
+以下のように、サンプルスライスが作成された後
+
+.. code-block:: go
 
 	slice := iBuffer[0:0]
 
-its header looks like this:
+そのヘッダーは次のようになります。
+
+.. code-block:: go
 
 	slice := sliceHeader{
 		Length:        0,
@@ -277,201 +360,332 @@ its header looks like this:
 		ZerothElement: &iBuffer[0],
 	}
 
-The `Capacity` field is equal to the length of the underlying array,
-minus the index in the array of the first element of the slice (zero in this case).
-If you want to inquire what the capacity is for a slice, use the built-in function `cap`:
+``Capacity`` フィールドは、基となる配列の長さから、スライスの最初の要素の配列のインデックス(この場合は0)を引いた値に等しくなります。スライスの容量を確認する場合は、組み込みの関数の ``cap`` を使用します。
+
+.. code-block:: go
 
 	if cap(slice) == len(slice) {
 		fmt.Println("slice is full!")
 	}
 
-* Make
+Make
 ===============================
 
-What if we want to grow the slice beyond its capacity?
-You can't!
-By definition, the capacity is the limit to growth.
-But you can achieve an equivalent result by allocating a new array, copying the data over, and modifying
-the slice to describe the new array.
+スライスをその容量を超えて成長させたい場合はどうなりますか？できません！定義上、容量は成長の限界です。ただし、新しい配列を割り当て、データをコピーし、スライスを変更して新しい配列を記述することにより、同等の結果を得ることができます。
 
-Let's start with allocation.
-We could use the `new` built-in function to allocate a bigger array
-and then slice the result,
-but it is simpler to use the `make` built-in function instead.
-It allocates a new array and
-creates a slice header to describe it, all at once.
-The `make` function takes three arguments: the type of the slice, its initial length, and its capacity, which is the
-length of the array that `make` allocates to hold the slice data.
-This call creates a slice of length 10 with room for 5 more (15-10), as you can see by running it:
+割り当てから始めましょう。組み込み関数 ``new`` を使用してより大きな配列を割り当て、結果をスライスできますが、代わりに ``make`` 組み込み関数を使用する方が簡単です。新しい配列を割り当て、それを記述するスライスヘッダーを一度に作成します。``make`` 関数は、3つの引数を取ります。スライスの型、その初期の長さ、およびその容量(スライスデータを保持するために ``make`` が割り当てる配列の長さ)です。この呼び出しは、実行するとわかるように、長さ10のスライスを作成し、さらに5つ(15-10)分のスペースを確保します。
 
-.play -edit slices/prog070.go /slice/,/fmt/
+.. code-block:: go
 
-This snippet doubles the capacity of our `int` slice but keeps its length the same:
+		slice := make([]int, 10, 15)
+		fmt.Printf("len: %d, cap: %d\n", len(slice), cap(slice))
 
-.play -edit slices/prog080.go /slice/,/OMIT/
+以下のスニペットは ``int`` スライスの容量を2倍にしますが、長さは同じままです。
 
-After running this code the slice has much more room to grow before needing another reallocation.
+.. code-block:: go
 
-When creating slices, it's often true that the length and capacity will be same.
-The `make` built-in has a shorthand for this common case.
-The length argument defaults to the capacity, so you can leave it out
-to set them both to the same value.
-After
+		slice := make([]int, 10, 15)
+		fmt.Printf("len: %d, cap: %d\n", len(slice), cap(slice))
+		newSlice := make([]int, len(slice), 2*cap(slice))
+		for i := range slice {
+			newSlice[i] = slice[i]
+		}
+		slice = newSlice
+		fmt.Printf("len: %d, cap: %d\n", len(slice), cap(slice))
+
+このコードを実行した後、スライスは、別の再割り当てを必要とする前に拡大する余地がはるかにあります。
+
+スライスを作成するとき、長さと容量が同じになることがよくあります。``make`` 組み込み関数には、この一般的なケースの省略形があります。容量はデフォルトで長さ引数と同じ値が設定されているため、省略して、両方を同じ値に設定できます。
+
+.. code-block:: go
 
 	gophers := make([]Gopher, 10)
 
-the `gophers` slice has both its length and capacity set to 10.
+``gophers`` スライスの長さと容量の両方が10に設定されています。
 
-* Copy
+Copy
 ===============================
 
-When we doubled the capacity of our slice in the previous section,
-we wrote a loop to copy the old data to the new slice.
-Go has a built-in function, `copy`, to make this easier.
-Its arguments are two slices, and it copies the data from the right-hand argument to the left-hand argument.
-Here's our example rewritten to use `copy`:
+前のセクションでスライスの容量を2倍にしたとき、古いデータを新しいスライスにコピーするループを作成しました。Goには、これを簡単にするための組み込み関数 ``copy`` があります。引数は2つのスライスであり、データを右側の引数から左側の引数にコピーします。コピーを使用するように書き直した例を次に示します。
 
-.play -edit slices/prog090.go /newSlice/,/newSlice/
+.. code-block:: go
 
-The `copy` function is smart.
-It only copies what it can, paying attention to the lengths of both arguments.
-In other words, the number of elements it copies is the minimum of the lengths of the two slices.
-This can save a little bookkeeping.
-Also, `copy` returns an integer value, the number of elements it copied, although it's not always worth checking.
+		newSlice := make([]int, len(slice), 2*cap(slice))
+		copy(newSlice, slice)
 
-The `copy` function also gets things right when source and destination overlap, which means it can be used to shift
-items around in a single slice.
-Here's how to use `copy` to insert a value into the middle of a slice.
+``copy`` 関数はスマートです。両方の引数の長さに注意を払いながら、できることだけをコピーします。つまり、コピーする要素の数は、2つのスライスの長さの最小値です。これにより、実装が少しだけ簡略化されます。また ``copy`` は、コピーした要素の数である整数値を返しますが、常にチェックする必要はありません。
 
-.code slices/prog100.go /Insert/,/^}/
+``copy`` 関数は、コピー元とコピー先の要素が重なるときにも適切に機能します。つまり、単一のスライス内でアイテムをシフトするために使用できます。``copy`` を使用して、スライスの中央に値を挿入する方法を次に示します。
 
-There are a couple of things to notice in this function.
-First, of course, it must return the updated slice because its length has changed.
-Second, it uses a convenient shorthand.
-The expression
+.. code-block:: go
+
+	// Insert inserts the value into the slice at the specified index,
+	// which must be in range.
+	// The slice must have room for the new element.
+	func Insert(slice []int, index, value int) []int {
+		// Grow the slice by one element.
+		slice = slice[0 : len(slice)+1]
+		// Use copy to move the upper part of the slice out of the way and open a hole.
+		copy(slice[index+1:], slice[index:])
+		// Store the new value.
+		slice[index] = value
+		// Return the result.
+		return slice
+	}
+
+この関数には、注意すべき点がいくつかあります。もちろん、最初に、長さが変更されているため、更新されたスライスを返す必要があります。第二に、便利な略記法を使用します。以下は
+
+.. code-block:: go
 
 	slice[i:]
 
-means exactly the same as
+とまったく同じ意味です。
+
+.. code-block:: go
 
 	slice[i:len(slice)]
 
-Also, although we haven't used the trick yet, we can leave out the first element of a slice expression too;
-it defaults to zero. Thus
+また、このトリックはまだ使用していませんが、スライス式の最初の要素も省略できます。デフォルトは0です。よって
+
+.. code-block:: go
 
 	slice[:]
 
-just means the slice itself, which is useful when slicing an array.
-This expression is the shortest way to say "a slice describing all the elements of the array":
+スライス自体を意味するだけで、配列をスライスするときに便利です。この式は「配列のすべての要素を記述するスライス」と言う最も簡単な方法です。
+
+.. code-block:: go
 
 	array[:]
 
-Now that's out of the way, let's run our `Insert` function.
+これで作業は完了です。``Insert`` 関数を実行しましょう。
 
-.play -edit slices/prog100.go /make/,/OMIT/
+.. code-block:: go
 
-* Append: An example
+		slice := make([]int, 10, 20) // Note capacity > length: room to add element.
+		for i := range slice {
+			slice[i] = i
+		}
+		fmt.Println(slice)
+		slice = Insert(slice, 5, 99)
+		fmt.Println(slice)
+
+.. note:: 
+
+	[訳注]: 以下の結果を得ることができます。
+	
+	::
+
+		[0 1 2 3 4 5 6 7 8 9]
+		[0 1 2 3 4 99 5 6 7 8 9]
+
+		Program exited.
+
+Append: 例
 ===============================
 
-A few sections back, we wrote an `Extend` function that extends a slice by one element.
-It was buggy, though, because if the slice's capacity was too small, the function would
-crash.
-(Our `Insert` example has the same problem.)
-Now we have the pieces in place to fix that, so let's write a robust implementation of
-`Extend` for integer slices.
+数セクション前に、1つの要素でスライスを拡張する ``Extend`` 関数を作成しました。 ただし、スライスの容量が小さすぎると機能がクラッシュするため、バグがありました。(``Insert`` の例にも同じ問題があります。)これを修正するための準備が整ったので、整数スライス用の ``Extend`` の堅牢な実装を作成しましょう。
 
-.code slices/prog110.go /func Extend/,/^}/
+.. code-block:: go
 
-In this case it's especially important to return the slice, since when it reallocates
-the resulting slice describes a completely different array.
-Here's a little snippet to demonstrate what happens as the slice fills up:
+	func Extend(slice []int, element int) []int {
+		n := len(slice)
+		if n == cap(slice) {
+			// Slice is full; must grow.
+			// We double its size and add 1, so if the size is zero we still grow.
+			newSlice := make([]int, len(slice), 2*len(slice)+1)
+			copy(newSlice, slice)
+			slice = newSlice
+		}
+		slice = slice[0 : n+1]
+		slice[n] = element
+		return slice
+	}
 
-.play -edit slices/prog110.go /START/,/END/
+この場合、スライスを返すことが特に重要です。スライスを再割り当てすると、結果のスライスが完全に異なる配列を記述するためです。スライスがいっぱいになったときに何が起こるかを示すための小さなスニペットを次に示します。
 
-Notice the reallocation when the initial array of size 5 is filled up.
-Both the capacity and the address of the zeroth element change when the new array is allocated.
+.. code-block:: go
 
-With the robust `Extend` function as a guide we can write an even nicer function that lets
-us extend the slice by multiple elements.
-To do this, we use Go's ability to turn a list of function arguments into a slice when the
-function is called.
-That is, we use Go's variadic function facility.
+		slice := make([]int, 0, 5)
+		for i := 0; i < 10; i++ {
+			slice = Extend(slice, i)
+			fmt.Printf("len=%d cap=%d slice=%v\n", len(slice), cap(slice), slice)
+			fmt.Println("address of 0th element:", &slice[0])
+		}
 
-Let's call the function `Append`.
-For the first version, we can just call `Extend` repeatedly so the mechanism of the variadic function is clear.
-The signature of `Append` is this:
+.. note:: 
+
+	[訳注]: 以下の結果を得ることができます。
+	
+	::
+
+		len=1 cap=5 slice=[0]
+		address of 0th element: 0x456000
+		len=2 cap=5 slice=[0 1]
+		address of 0th element: 0x456000
+		len=3 cap=5 slice=[0 1 2]
+		address of 0th element: 0x456000
+		len=4 cap=5 slice=[0 1 2 3]
+		address of 0th element: 0x456000
+		len=5 cap=5 slice=[0 1 2 3 4]
+		address of 0th element: 0x456000
+		len=6 cap=11 slice=[0 1 2 3 4 5]
+		address of 0th element: 0x454030
+		len=7 cap=11 slice=[0 1 2 3 4 5 6]
+		address of 0th element: 0x454030
+		len=8 cap=11 slice=[0 1 2 3 4 5 6 7]
+		address of 0th element: 0x454030
+		len=9 cap=11 slice=[0 1 2 3 4 5 6 7 8]
+		address of 0th element: 0x454030
+		len=10 cap=11 slice=[0 1 2 3 4 5 6 7 8 9]
+		address of 0th element: 0x454030
+
+		Program exited.
+
+サイズ5の初期配列がいっぱいになると、再割り当てに注意してください。新しい配列が割り当てられると、0番目の要素の容量とアドレスが変更されます。
+
+堅牢な ``Extend`` 関数をガイドとして使用すると、スライスを複数の要素で拡張できるさらに優れた関数を作成できます。 これを行うには、関数の呼び出し時に関数の引数のリストをスライスに変換するGoの機能を使用します。つまり、Goの可変機能機能を使用します。
+
+関数 ``Append`` を呼び出しましょう。最初のバージョンでは ``Extend`` を繰り返し呼び出すだけで、可変引数関数のメカニズムが明確になります。追加したシグネチャは次のとおりです。
+
+.. code-block:: go
 
 	func Append(slice []int, items ...int) []int
 
-What that says is that `Append` takes one argument, a slice, followed by zero or more
-`int` arguments.
-Those arguments are exactly a slice of `int` as far as the implementation
-of `Append` is concerned, as you can see:
+つまり ``Append`` は1つの引数(スライス)の後に0個以上の ``int`` の引数が続くということです。これらの引数は、次のように ``Append`` の実装に関する限り、``int`` のスライスです。
 
-.code slices/prog120.go /Append/,/^}/
+.. code-block:: go
 
-Notice the `for` `range` loop iterating over the elements of the `items` argument, which has implied type `[]int`.
-Also notice the use of the blank identifier `_` to discard the index in the loop, which we don't need in this case.
+	// Append appends the items to the slice.
+	// First version: just loop calling Extend.
+	func Append(slice []int, items ...int) []int {
+		for _, item := range items {
+			slice = Extend(slice, item)
+		}
+		return slice
+	}
+
+``for`` ``range`` のループが ``items`` 引数の要素を反復処理していることに注目してください。これは型 ``[]int`` を暗黙的に示しています。また、ループ内のインデックスを破棄するために空白の識別子 ``_`` を使用していることに注意してください。この場合はインデックスは必要ありません。
 
 Try it:
 
-.play -edit slices/prog120.go /START/,/END/
+.. code-block:: go
 
-Another new technique in this example is that we initialize the slice by writing a composite literal,
-which consists of the type of the slice followed by its elements in braces:
+		slice := []int{0, 1, 2, 3, 4}
+		fmt.Println(slice)
+		slice = Append(slice, 5, 6, 7, 8)
+		fmt.Println(slice)
 
-.code slices/prog120.go /slice := /
+この例のもう1つの新しいテクニックは、複合リテラルを記述することによってスライスを初期化することです。複合リテラルは、スライスのタイプとそれに続く括弧で囲まれた要素で構成されます。
 
-The `Append` function is interesting for another reason.
-Not only can we append elements, we can append a whole second slice
-by "exploding" the slice into arguments using the `...` notation at the call site:
+.. code-block:: go
 
-.play -edit slices/prog130.go /START/,/END/
+		slice := []int{0, 1, 2, 3, 4}
 
-Of course, we can make `Append` more efficient by allocating no more than once,
-building on the innards of `Extend`:
+``Append`` 機能は、別の理由で興味深いものです。要素を追加できるだけでなく、呼び出し側で ``...`` 表記を使用して、スライスを引数に「展開」することにより、2番目のスライス全体を追加できます。
 
-.code slices/prog140.go /Append/,/^}/
+.. code-block:: go
 
-Here, notice how we use `copy` twice, once to move the slice data to the newly
-allocated memory, and then to copy the appending items to the end of the old data.
+		slice1 := []int{0, 1, 2, 3, 4}
+		slice2 := []int{55, 66, 77}
+		fmt.Println(slice1)
+		slice1 = Append(slice1, slice2...) // The '...' is essential!
+		fmt.Println(slice1)
 
-Try it; the behavior is the same as before:
+もちろん ``Extend`` の内部に基づいて複数回割り当てることで、``Append`` をより効率的にすることができます。
 
-.play -edit slices/prog140.go /START/,/END/
+.. code-block:: go
 
-* Append: The built-in function
+	// Append appends the elements to the slice.
+	// Efficient version.
+	func Append(slice []int, elements ...int) []int {
+		n := len(slice)
+		total := len(slice) + len(elements)
+		if total > cap(slice) {
+			// Reallocate. Grow to 1.5 times the new size, so we can still grow.
+			newSize := total*3/2 + 1
+			newSlice := make([]int, total, newSize)
+			copy(newSlice, slice)
+			slice = newSlice
+		}
+		slice = slice[:total]
+		copy(slice[n:], elements)
+		return slice
+	}
+
+ここで、``copy`` を2回使用する方法に注意してください。1回はスライスデータを新しく割り当てられたメモリに移動し、その後、追加するデータを古いデータの最後にコピーします。
+
+以下を試してみてください;動作は以前と同じです。
+
+.. code-block:: go
+
+		slice1 := []int{0, 1, 2, 3, 4}
+		slice2 := []int{55, 66, 77}
+		fmt.Println(slice1)
+		slice1 = Append(slice1, slice2...) // The '...' is essential!
+		fmt.Println(slice1)
+
+Append: 組み込み関数
 ===============================
 
-And so we arrive at the motivation for the design of the `append` built-in function.
-It does exactly what our `Append` example does, with equivalent efficiency, but it
-works for any slice type.
+それで、``append`` 組み込み関数の設計の動機に到達します。``Append`` の例と同等の効率で正確に機能しますが、どのスライス型でも機能します。
 
-A weakness of Go is that any generic-type operations must be provided by the
-run-time. Some day that may change, but for now, to make working with slices
-easier, Go provides a built-in generic `append` function.
-It works the same as our `int` slice version, but for _any_ slice type.
+Goの弱点は、ジェネリック型の操作を実行時に提供する必要があることです。いつか変わる可能性がありますが、現時点では、スライスの操作を簡単にするために、Goには組み込みの汎用 ``append`` 関数が用意されています。``int`` スライスバージョンと同じように機能しますが **すべて** のスライス型に対して機能します。
 
-Remember, since the slice header is always updated by a call to `append`, you need
-to save the returned slice after the call.
-In fact, the compiler won't let you call append without saving the result.
+スライスヘッダーは ``append`` の呼び出しによって常に更新されるため、呼び出し後に返されたスライスを保存する必要があることに注意してください。実際、コンパイラーは結果を保存せずに ``append`` を呼び出すことはできません。
 
-Here are some one-liners intermingled with print statements. Try them, edit them and explore:
+以下は、printステートメントと混ざったワンライナーです。それらを試して編集し、探索してください：
 
-.play -edit slices/prog150.go /START/,/END/
+.. code-block:: go
 
-It's worth taking a moment to think about the final one-liner of that example in detail to understand
-how the design of slices makes it possible for this simple call to work correctly.
+		// Create a couple of starter slices.
+		slice := []int{1, 2, 3}
+		slice2 := []int{55, 66, 77}
+		fmt.Println("Start slice: ", slice)
+		fmt.Println("Start slice2:", slice2)
 
-There are lots more examples of `append`, `copy`, and other ways to use slices
-on the community-built
-[[https://golang.org/wiki/SliceTricks]["Slice Tricks" Wiki page]].
+		// Add an item to a slice.
+		slice = append(slice, 4)
+		fmt.Println("Add one item:", slice)
+
+		// Add one slice to another.
+		slice = append(slice, slice2...)
+		fmt.Println("Add one slice:", slice)
+
+		// Make a copy of a slice (of int).
+		slice3 := append([]int(nil), slice...)
+		fmt.Println("Copy a slice:", slice3)
+
+		// Copy a slice to the end of itself.
+		fmt.Println("Before append to self:", slice)
+		slice = append(slice, slice...)
+		fmt.Println("After append to self:", slice)
+
+.. note:: 
+
+	[訳注]: 以下の結果を得ることができます。
+	
+	::
+
+		Start slice:  [1 2 3]
+		Start slice2: [55 66 77]
+		Add one item: [1 2 3 4]
+		Add one slice: [1 2 3 4 55 66 77]
+		Copy a slice: [1 2 3 4 55 66 77]
+		Before append to self: [1 2 3 4 55 66 77]
+		After append to self: [1 2 3 4 55 66 77 1 2 3 4 55 66 77]
+
+		Program exited.
+
+スライスの設計によってこの単純な呼び出しが正しく機能することを可能にする方法を理解するために、その例の最後のワンライナーについて詳しく考える時間をとる価値があります。
+
+コミュニティが構築した「 `Slice Trickes <https://golang.org/wiki/SliceTricks>`_ 」Wikiページには、スライスの ``append``、``copy`` 、およびその他の使用方法の例が他にもたくさんあります。
 
 * Nil
 ===============================
 
-As an aside, with our newfound knowledge we can see what the representation of a `nil` slice is.
-Naturally, it is the zero value of the slice header:
+余談ですが、私たちの新たな知見により ``nil`` スライスの表現が何であるかを見ることができます。当然、スライスヘッダーの値はゼロです。
+
+.. code-block:: go
 
 	sliceHeader{
 		Length:        0,
@@ -479,99 +693,79 @@ Naturally, it is the zero value of the slice header:
 		ZerothElement: nil,
 	}
 
-or just
+あるいは単に
+
+.. code-block:: go
 
 	sliceHeader{}
 
-The key detail is that the element pointer is `nil` too. The slice created by
+重要な詳細は、配列の要素へのポインタも ``nil`` であることです。
+
+.. code-block:: go
 
 	array[0:0]
 
-has length zero (and maybe even capacity zero) but its pointer is not `nil`, so
-it is not a nil slice.
+上記によって作成されたスライスは長さ0(および場合によっては容量0)がありますが、そのポインターは ``nil`` ではないため、nilスライスではありません。
 
-As should be clear, an empty slice can grow (assuming it has non-zero capacity), but a `nil`
-slice has no array to put values in and can never grow to hold even one element.
+明らかなように、空のスライスは大きくなる可能性があります(容量がゼロでないと仮定します)が、``nil`` スライスには値を入れる配列がなく、1つの要素を保持するために大きくなることはありません。
 
-That said, a `nil` slice is functionally equivalent to a zero-length slice, even though it points
-to nothing.
-It has length zero and can be appended to, with allocation.
-As an example, look at the one-liner above that copies a slice by appending
-to a `nil` slice.
+つまり ``nil`` スライスは、要素へのポインタを保持していない場合でも、機能的に長さが0のスライスと同等です。 長さは0で、割り当てて追加できます。 例として、``nil`` スライスに追加してスライスをコピーする上記の1行のライナーを見てください。
 
-* Strings
+* 文字列(Strings)
 ===============================
 
-Now a brief section about strings in Go in the context of slices.
+スライスのコンテキストにおけるGoの文字列に関する簡単なセクションです。
 
-Strings are actually very simple: they are just read-only slices of bytes with a bit
-of extra syntactic support from the language.
+文字列は実際には非常に単純です。文字列は読み取り専用のバイトスライスであり、言語からの余分な構文サポートが少しあります。
 
-Because they are read-only, there is no need for a capacity (you can't grow them),
-but otherwise for most purposes you can treat them just like read-only slices
-of bytes.
+これらは読み取り専用であるため、容量は必要ありません(容量を増やすことはできません)が、それ以外の場合はほとんどの目的で、読み取り専用のバイトスライスのように扱うことができます。
 
-For starters, we can index them to access individual bytes:
+まず、個々のバイトにアクセスするためにインデックスを作成できます。
+
+.. code-block:: go
 
 	slash := "/usr/ken"[0] // yields the byte value '/'.
 
-We can slice a string to grab a substring:
+文字列をスライスして部分文字列を取得できます。
+
+.. code-block:: go
 
 	usr := "/usr/ken"[0:4] // yields the string "/usr"
 
-It should be obvious now what's going on behind the scenes when we slice a string.
+これで、文字列をスライスしたときに裏で何が起こっているかが明らかになります。
 
-We can also take a normal slice of bytes and create a string from it with the simple conversion:
+通常のバイトスライスを取得し、単純な変換を使用して、そこから文字列を作成することもできます。
+
+.. code-block:: go
 
 	str := string(slice)
 
-and go in the reverse direction as well:
+そして逆のこともできます。
+
+.. code-block:: go
 
 	slice := []byte(usr)
 
-The array underlying a string is hidden from view; there is no way to access its contents
-except through the string. That means that when we do either of these conversions, a
-copy of the array must be made.
-Go takes care of this, of course, so you don't have to.
-After either of these conversions, modifications to
-the array underlying the byte slice don't affect the corresponding string.
+文字列の基になる配列はビューから隠されています。stringを使用しない限り、そのコンテンツにアクセスする方法はありません。つまり、これらの変換のいずれかを行う場合、配列のコピーを作成する必要があります。もちろん、Goがこれを処理するので、必要はありません。これらの変換のいずれかの後、バイトスライスの基になる配列への変更は、対応する文字列に影響しません。
 
-An important consequence of this slice-like design for strings is that
-creating a substring is very efficient.
-All that needs to happen
-is the creation of a two-word string header. Since the string is read-only, the original
-string and the string resulting from the slice operation can share the same array safely.
+この文字列のスライスのような設計の重要な結果は、部分文字列の作成が非常に効率的であることです。発生する必要があるのは、2ワードの文字列ヘッダーを作成することだけです。文字列は読み取り専用であるため、元の文字列とスライス操作の結果の文字列は同じ配列を安全に共有できます。
 
-A historical note: The earliest implementation of strings always allocated, but when slices
-were added to the language, they provided a model for efficient string handling. Some of
-the benchmarks saw huge speedups as a result.
+歴史的なメモ：文字列の初期実装は常に割り当てられますが、言語にスライスが追加されると、文字列を効率的に処理するためのモデルが提供されました。一部のベンチマークでは、結果として大幅な高速化が見られました。
 
-There's much more to strings, of course, and a
-[[https://blog.golang.org/strings][separate blog post]] covers them in greater depth.
+もちろん、文字列にはさらに多くのものがあり、`別のブログ投稿 <https://blog.golang.org/strings>`_ で文字列の詳細を説明しています。
 
 結論
 ===============================
 
-To understand how slices work, it helps to understand how they are implemented.
-There is a little data structure, the slice header, that is the item associated with the slice
-variable, and that header describes a section of a separately allocated array.
-When we pass slice values around, the header gets copied but the array it points
-to is always shared.
+スライスの仕組みを理解するには、スライスの実装方法を理解することが役立ちます。スライスヘッダーという小さなデータ構造があります。これは、スライス変数に関連付けられたアイテムです。このヘッダーは、個別に割り当てられた配列のセクションを記述します。 スライス値を渡すと、ヘッダーがコピーされますが、ヘッダーが指す配列は常に共有されます。
 
-Once you appreciate how they work, slices become not only easy to use, but
-powerful and expressive, especially with the help of the `copy` and `append`
-built-in functions.
+スライスがどのように機能するかを理解すると、スライスは使いやすくなるだけでなく、特に組み込み関数の ``copy`` と ``append`` の助けを借りて、強力で表現力豊かになります。
 
 さらに読むために
 ===============================
 
-There's lots to find around the intertubes about slices in Go.
-As mentioned earlier,
-the [[https://golang.org/wiki/SliceTricks]["Slice Tricks" Wiki page]]
-has many examples.
-The [[https://blog.golang.org/go-slices-usage-and-internals][Go Slices]] blog post
-describes the memory layout details with clear diagrams.
-Russ Cox's [[https://research.swtch.com/godata][Go Data Structures]] article includes
-a discussion of slices along with some of Go's other internal data structures.
+Goのスライスに関するintertubesの周りには、たくさんの発見があります。 前述のように、「 `Slice Trickes <https://golang.org/wiki/SliceTricks>`_ 」Wikiページには多くの例があります。 `Go Slices <https://blog.golang.org/go-slices-usage-and-internals>`_ のブログ投稿では、メモリレイアウトの詳細をわかりやすい図で説明しています。 Russ Coxの `Go Data Structures <https://research.swtch.com/godata>`_ の記事には、Goの他の内部データ構造の一部とともにスライスの説明が含まれています。
 
-There is much more material available, but the best way to learn about slices is to use them.
+.. todo:: intertubes の意味がわからない
+
+より多くの資料が利用可能ですが、スライスについて学ぶ最良の方法はそれらを使用することです。

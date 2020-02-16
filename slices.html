@@ -186,315 +186,456 @@ Tags: array, slice, string, copy, append</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>It seems clumsy in that example, especially dealing with the extra level of indirection
-(a temporary variable helps),
-but there is one common case where you see pointers to slices.
-It is idiomatic to use a pointer receiver for a method that modifies a slice.</p>
-<p>Let's say we wanted to have a method on a slice that truncates it at the final slash.
-We could write it like this:</p>
-<p>.play -edit slices/prog040.go /^type/,$</p>
-<p>If you run this example you'll see that it works properly, updating the slice in the caller.</p>
-<p>[Exercise: Change the type of the receiver to be a value rather
-than a pointer and run it again. Explain what happens.]</p>
-<p>On the other hand, if we wanted to write a method for <cite>path</cite> that upper-cases
-the ASCII letters in the path (parochially ignoring non-English names), the method could
-be a value because the value receiver will still point to the same underlying array.</p>
-<p>.play -edit slices/prog050.go /^type/,$</p>
-<p>Here the <cite>ToUpper</cite> method uses two variables in the <cite>for</cite> <cite>range</cite> construct
-to capture the index and slice element.
-This form of loop avoids writing <cite>p[i]</cite> multiple times in the body.</p>
-<p>[Exercise: Convert the <cite>ToUpper</cite> method to use a pointer receiver and see if its behavior changes.]</p>
-<p>[Advanced exercise: Convert the <cite>ToUpper</cite> method to handle Unicode letters, not just ASCII.]</p>
-<ul class="simple">
-<li><p>Capacity</p></li>
-</ul>
-<hr class="docutils" />
-<p>Look at the following function that extends its argument slice of <cite>ints</cite> by one element:</p>
-<p>.code slices/prog060.go /^func Extend/,/^}/</p>
+<p>上記の例では、特に余計な間接参照のレベルを扱う場合(一時的な変数が役たちます)ぎこちないように見えます。しかしスライスへのポインターを見かける一般的なケースが1つあります。スライスを変更するメソッドにポインターレシーバーを使用するのが慣用的です。</p>
+<div class="admonition-todo admonition" id="id6">
+<p class="admonition-title">課題</p>
+<p>訳がわからない</p>
+<p>It seems clumsy in that example, especially dealing with the extra level of indirection (a temporary variable helps)</p>
+<p>上記の例では、特に余計な間接参照のレベルを扱う場合(一時的な変数が役たちます)ぎこちないように見えます。</p>
+</div>
+<p>最後のスラッシュで切り捨てるメソッドをスライスに持たせたいとしましょう。次のように書くことができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">path</span> <span class="p">[]</span><span class="kt">byte</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">path</span><span class="p">)</span> <span class="nx">TruncateAtFinalSlash</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">i</span> <span class="o">:=</span> <span class="nx">bytes</span><span class="p">.</span><span class="nx">LastIndex</span><span class="p">(</span><span class="o">*</span><span class="nx">p</span><span class="p">,</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">&quot;/&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nx">i</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="p">{</span>
+                <span class="o">*</span><span class="nx">p</span> <span class="p">=</span> <span class="p">(</span><span class="o">*</span><span class="nx">p</span><span class="p">)[</span><span class="mi">0</span><span class="p">:</span><span class="nx">i</span><span class="p">]</span>
+        <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">pathName</span> <span class="o">:=</span> <span class="nx">path</span><span class="p">(</span><span class="s">&quot;/usr/bin/tso&quot;</span><span class="p">)</span> <span class="c1">// Conversion from string to path.</span>
+        <span class="nx">pathName</span><span class="p">.</span><span class="nx">TruncateAtFinalSlash</span><span class="p">()</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;%s\n&quot;</span><span class="p">,</span> <span class="nx">pathName</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>この例を実行すると、正しく動作し、呼び出し元のスライスを更新することがわかります。</p>
+<p>[演習：レシーバーの型をポインターではなく値に変更して、再度実行します。何が起こるかを説明してください。]</p>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p>[訳注] レシーバの型を値にすると、呼び出したときにスライスのコピーが渡されます。関数内でスライスを切り出して別のスライスを作成したとしても <code class="docutils literal notranslate"><span class="pre">pathName</span></code> には影響がありません。</p>
+</div>
+<p>一方、パス内のASCII文字を大文字にする(英語以外の名前を無視することで) <code class="docutils literal notranslate"><span class="pre">path</span></code> のメソッドを作成する場合、値のレシーバーは同じ基になる配列を指すため、メソッドは値になる可能性があります。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">path</span> <span class="p">[]</span><span class="kt">byte</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">path</span><span class="p">)</span> <span class="nx">ToUpper</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">for</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">b</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">p</span> <span class="p">{</span>
+                <span class="k">if</span> <span class="sc">&#39;a&#39;</span> <span class="o">&lt;=</span> <span class="nx">b</span> <span class="o">&amp;&amp;</span> <span class="nx">b</span> <span class="o">&lt;=</span> <span class="sc">&#39;z&#39;</span> <span class="p">{</span>
+                        <span class="nx">p</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">b</span> <span class="o">+</span> <span class="sc">&#39;A&#39;</span> <span class="o">-</span> <span class="sc">&#39;a&#39;</span>
+                <span class="p">}</span>
+        <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">pathName</span> <span class="o">:=</span> <span class="nx">path</span><span class="p">(</span><span class="s">&quot;/usr/bin/tso&quot;</span><span class="p">)</span>
+        <span class="nx">pathName</span><span class="p">.</span><span class="nx">ToUpper</span><span class="p">()</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;%s\n&quot;</span><span class="p">,</span> <span class="nx">pathName</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>ここで <code class="docutils literal notranslate"><span class="pre">ToUpper</span></code> メソッドは、<code class="docutils literal notranslate"><span class="pre">for</span></code> <code class="docutils literal notranslate"><span class="pre">range</span></code> 構造内の2つの変数を使用して、インデックスとスライス要素をキャプチャします。この形式のループは、内で複数回 <code class="docutils literal notranslate"><span class="pre">p[i]</span></code> を書き込むことを避けます。</p>
+<p>[演習：<code class="docutils literal notranslate"><span class="pre">ToUpper</span></code> メソッドを変換してポインターレシーバーを使用し、その動作が変化するかどうかを確認します。]</p>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p>レシーバに値を渡してもポインタを渡しても動作に変化はありません。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">path</span> <span class="p">[]</span><span class="kt">byte</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">path</span><span class="p">)</span> <span class="nx">ToUpper</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">for</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">b</span> <span class="o">:=</span> <span class="k">range</span> <span class="o">*</span><span class="nx">p</span> <span class="p">{</span>
+                <span class="k">if</span> <span class="sc">&#39;a&#39;</span> <span class="o">&lt;=</span> <span class="nx">b</span> <span class="o">&amp;&amp;</span> <span class="nx">b</span> <span class="o">&lt;=</span> <span class="sc">&#39;z&#39;</span> <span class="p">{</span>
+                        <span class="p">(</span><span class="o">*</span><span class="nx">p</span><span class="p">)[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">b</span> <span class="o">+</span> <span class="sc">&#39;A&#39;</span> <span class="o">-</span> <span class="sc">&#39;a&#39;</span>
+                <span class="p">}</span>
+        <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">pathName</span> <span class="o">:=</span> <span class="nx">path</span><span class="p">(</span><span class="s">&quot;/usr/bin/tso&quot;</span><span class="p">)</span>
+        <span class="nx">pathName</span><span class="p">.</span><span class="nx">ToUpper</span><span class="p">()</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;%s\n&quot;</span><span class="p">,</span> <span class="nx">pathName</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">/</span><span class="n">USR</span><span class="o">/</span><span class="n">BIN</span><span class="o">/</span><span class="n">TSO</span>
+
+<span class="n">Program</span> <span class="n">exited</span><span class="o">.</span>
+</pre></div>
+</div>
+</div>
+<p>[高度な演習：<code class="docutils literal notranslate"><span class="pre">ToUpper</span></code> メソッドを変換して、ASCIIだけでなくUnicode文字を処理します。]</p>
+</div>
+<div class="section" id="capacity">
+<h2>容量(Capacity)<a class="headerlink" href="#capacity" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">ints</span></code> の引数スライスを1つの要素だけ拡張する次の関数を見てください。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Extend</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">element</span> <span class="kt">int</span><span class="p">)</span> <span class="p">[]</span><span class="kt">int</span> <span class="p">{</span>
+        <span class="nx">n</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+        <span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">0</span> <span class="p">:</span> <span class="nx">n</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="nx">slice</span><span class="p">[</span><span class="nx">n</span><span class="p">]</span> <span class="p">=</span> <span class="nx">element</span>
+        <span class="k">return</span> <span class="nx">slice</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>(変更されたスライスを返す必要があるのはなぜですか？)それを実行します：</p>
 <p>(Why does it need to return the modified slice?) Now run it:</p>
-<p>.play -edit slices/prog060.go /^func main/,/^}/</p>
-<p>See how the slice grows until... it doesn't.</p>
-<p>It's time to talk about the third component of the slice header: its _capacity_.
-Besides the array pointer and length, the slice header also stores its capacity:</p>
-<blockquote>
-<div><dl class="simple">
-<dt>type sliceHeader struct {</dt><dd><p>Length        int
-Capacity      int
-ZerothElement <a href="#id6"><span class="problematic" id="id7">*</span></a>byte</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
-<p>The <cite>Capacity</cite> field records how much space the underlying array actually has; it is the maximum
-value the <cite>Length</cite> can reach.
-Trying to grow the slice beyond its capacity will step beyond the limits of the array and will trigger a panic.</p>
-<p>After our example slice is created by</p>
-<blockquote>
-<div><p>slice := iBuffer[0:0]</p>
-</div></blockquote>
-<p>its header looks like this:</p>
-<blockquote>
-<div><dl class="simple">
-<dt>slice := sliceHeader{</dt><dd><p>Length:        0,
-Capacity:      10,
-ZerothElement: &amp;iBuffer[0],</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
-<p>The <cite>Capacity</cite> field is equal to the length of the underlying array,
-minus the index in the array of the first element of the slice (zero in this case).
-If you want to inquire what the capacity is for a slice, use the built-in function <cite>cap</cite>:</p>
-<blockquote>
-<div><dl class="simple">
-<dt>if cap(slice) == len(slice) {</dt><dd><p>fmt.Println(&quot;slice is full!&quot;)</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
-<ul class="simple">
-<li><p>Make</p></li>
-</ul>
-<hr class="docutils" />
-<p>What if we want to grow the slice beyond its capacity?
-You can't!
-By definition, the capacity is the limit to growth.
-But you can achieve an equivalent result by allocating a new array, copying the data over, and modifying
-the slice to describe the new array.</p>
-<p>Let's start with allocation.
-We could use the <cite>new</cite> built-in function to allocate a bigger array
-and then slice the result,
-but it is simpler to use the <cite>make</cite> built-in function instead.
-It allocates a new array and
-creates a slice header to describe it, all at once.
-The <cite>make</cite> function takes three arguments: the type of the slice, its initial length, and its capacity, which is the
-length of the array that <cite>make</cite> allocates to hold the slice data.
-This call creates a slice of length 10 with room for 5 more (15-10), as you can see by running it:</p>
-<p>.play -edit slices/prog070.go /slice/,/fmt/</p>
-<p>This snippet doubles the capacity of our <cite>int</cite> slice but keeps its length the same:</p>
-<p>.play -edit slices/prog080.go /slice/,/OMIT/</p>
-<p>After running this code the slice has much more room to grow before needing another reallocation.</p>
-<p>When creating slices, it's often true that the length and capacity will be same.
-The <cite>make</cite> built-in has a shorthand for this common case.
-The length argument defaults to the capacity, so you can leave it out
-to set them both to the same value.
-After</p>
-<blockquote>
-<div><p>gophers := make([]Gopher, 10)</p>
-</div></blockquote>
-<p>the <cite>gophers</cite> slice has both its length and capacity set to 10.</p>
-<ul class="simple">
-<li><p>Copy</p></li>
-</ul>
-<hr class="docutils" />
-<p>When we doubled the capacity of our slice in the previous section,
-we wrote a loop to copy the old data to the new slice.
-Go has a built-in function, <cite>copy</cite>, to make this easier.
-Its arguments are two slices, and it copies the data from the right-hand argument to the left-hand argument.
-Here's our example rewritten to use <cite>copy</cite>:</p>
-<p>.play -edit slices/prog090.go /newSlice/,/newSlice/</p>
-<p>The <cite>copy</cite> function is smart.
-It only copies what it can, paying attention to the lengths of both arguments.
-In other words, the number of elements it copies is the minimum of the lengths of the two slices.
-This can save a little bookkeeping.
-Also, <cite>copy</cite> returns an integer value, the number of elements it copied, although it's not always worth checking.</p>
-<p>The <cite>copy</cite> function also gets things right when source and destination overlap, which means it can be used to shift
-items around in a single slice.
-Here's how to use <cite>copy</cite> to insert a value into the middle of a slice.</p>
-<p>.code slices/prog100.go /Insert/,/^}/</p>
-<p>There are a couple of things to notice in this function.
-First, of course, it must return the updated slice because its length has changed.
-Second, it uses a convenient shorthand.
-The expression</p>
-<blockquote>
-<div><p>slice[i:]</p>
-</div></blockquote>
-<p>means exactly the same as</p>
-<blockquote>
-<div><p>slice[i:len(slice)]</p>
-</div></blockquote>
-<p>Also, although we haven't used the trick yet, we can leave out the first element of a slice expression too;
-it defaults to zero. Thus</p>
-<blockquote>
-<div><p>slice[:]</p>
-</div></blockquote>
-<p>just means the slice itself, which is useful when slicing an array.
-This expression is the shortest way to say &quot;a slice describing all the elements of the array&quot;:</p>
-<blockquote>
-<div><p>array[:]</p>
-</div></blockquote>
-<p>Now that's out of the way, let's run our <cite>Insert</cite> function.</p>
-<p>.play -edit slices/prog100.go /make/,/OMIT/</p>
-<ul class="simple">
-<li><p>Append: An example</p></li>
-</ul>
-<hr class="docutils" />
-<p>A few sections back, we wrote an <cite>Extend</cite> function that extends a slice by one element.
-It was buggy, though, because if the slice's capacity was too small, the function would
-crash.
-(Our <cite>Insert</cite> example has the same problem.)
-Now we have the pieces in place to fix that, so let's write a robust implementation of
-<cite>Extend</cite> for integer slices.</p>
-<p>.code slices/prog110.go /func Extend/,/^}/</p>
-<p>In this case it's especially important to return the slice, since when it reallocates
-the resulting slice describes a completely different array.
-Here's a little snippet to demonstrate what happens as the slice fills up:</p>
-<p>.play -edit slices/prog110.go /START/,/END/</p>
-<p>Notice the reallocation when the initial array of size 5 is filled up.
-Both the capacity and the address of the zeroth element change when the new array is allocated.</p>
-<p>With the robust <cite>Extend</cite> function as a guide we can write an even nicer function that lets
-us extend the slice by multiple elements.
-To do this, we use Go's ability to turn a list of function arguments into a slice when the
-function is called.
-That is, we use Go's variadic function facility.</p>
-<p>Let's call the function <cite>Append</cite>.
-For the first version, we can just call <cite>Extend</cite> repeatedly so the mechanism of the variadic function is clear.
-The signature of <cite>Append</cite> is this:</p>
-<blockquote>
-<div><p>func Append(slice []int, items ...int) []int</p>
-</div></blockquote>
-<p>What that says is that <cite>Append</cite> takes one argument, a slice, followed by zero or more
-<cite>int</cite> arguments.
-Those arguments are exactly a slice of <cite>int</cite> as far as the implementation
-of <cite>Append</cite> is concerned, as you can see:</p>
-<p>.code slices/prog120.go /Append/,/^}/</p>
-<p>Notice the <cite>for</cite> <cite>range</cite> loop iterating over the elements of the <cite>items</cite> argument, which has implied type <cite>[]int</cite>.
-Also notice the use of the blank identifier <cite>_</cite> to discard the index in the loop, which we don't need in this case.</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+        <span class="kd">var</span> <span class="nx">iBuffer</span> <span class="p">[</span><span class="mi">10</span><span class="p">]</span><span class="kt">int</span>
+        <span class="nx">slice</span> <span class="o">:=</span> <span class="nx">iBuffer</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">20</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+                <span class="nx">slice</span> <span class="p">=</span> <span class="nx">Extend</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="nx">i</span><span class="p">)</span>
+                <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+        <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>スライスがどのように成長するかを確認してください...。最後までは成長しません。</p>
+<p>スライスヘッダーの3番目のコンポーネントである容量について説明します。配列へのポインタと長さに加えて、スライスヘッダーにはその <em>容量</em> も格納されます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">sliceHeader</span> <span class="kd">struct</span> <span class="p">{</span>
+        <span class="nx">Length</span>        <span class="kt">int</span>
+        <span class="nx">Capacity</span>      <span class="kt">int</span>
+        <span class="nx">ZerothElement</span> <span class="o">*</span><span class="kt">byte</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Capacity</span></code> フィールドには、基になる配列に実際にどのくらいのスペースがあるかが記録されます。これは <code class="docutils literal notranslate"><span class="pre">Length</span></code> が到達できる最大値です。スライスをその容量を超えて拡大しようとすると、配列の制限を超えてパニックを引き起こします。</p>
+<p>以下のように、サンプルスライスが作成された後</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="nx">iBuffer</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">0</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>そのヘッダーは次のようになります。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="nx">sliceHeader</span><span class="p">{</span>
+        <span class="nx">Length</span><span class="p">:</span>        <span class="mi">0</span><span class="p">,</span>
+        <span class="nx">Capacity</span><span class="p">:</span>      <span class="mi">10</span><span class="p">,</span>
+        <span class="nx">ZerothElement</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">iBuffer</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Capacity</span></code> フィールドは、基となる配列の長さから、スライスの最初の要素の配列のインデックス(この場合は0)を引いた値に等しくなります。スライスの容量を確認する場合は、組み込みの関数の <code class="docutils literal notranslate"><span class="pre">cap</span></code> を使用します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;slice is full!&quot;</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="make">
+<h2>Make<a class="headerlink" href="#make" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>スライスをその容量を超えて成長させたい場合はどうなりますか？できません！定義上、容量は成長の限界です。ただし、新しい配列を割り当て、データをコピーし、スライスを変更して新しい配列を記述することにより、同等の結果を得ることができます。</p>
+<p>割り当てから始めましょう。組み込み関数 <code class="docutils literal notranslate"><span class="pre">new</span></code> を使用してより大きな配列を割り当て、結果をスライスできますが、代わりに <code class="docutils literal notranslate"><span class="pre">make</span></code> 組み込み関数を使用する方が簡単です。新しい配列を割り当て、それを記述するスライスヘッダーを一度に作成します。<code class="docutils literal notranslate"><span class="pre">make</span></code> 関数は、3つの引数を取ります。スライスの型、その初期の長さ、およびその容量(スライスデータを保持するために <code class="docutils literal notranslate"><span class="pre">make</span></code> が割り当てる配列の長さ)です。この呼び出しは、実行するとわかるように、長さ10のスライスを作成し、さらに5つ(15-10)分のスペースを確保します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;len: %d, cap: %d\n&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>以下のスニペットは <code class="docutils literal notranslate"><span class="pre">int</span></code> スライスの容量を2倍にしますが、長さは同じままです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;len: %d, cap: %d\n&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+<span class="nx">newSlice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="mi">2</span><span class="o">*</span><span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">slice</span> <span class="p">{</span>
+        <span class="nx">newSlice</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
+<span class="p">}</span>
+<span class="nx">slice</span> <span class="p">=</span> <span class="nx">newSlice</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;len: %d, cap: %d\n&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>このコードを実行した後、スライスは、別の再割り当てを必要とする前に拡大する余地がはるかにあります。</p>
+<p>スライスを作成するとき、長さと容量が同じになることがよくあります。<code class="docutils literal notranslate"><span class="pre">make</span></code> 組み込み関数には、この一般的なケースの省略形があります。容量はデフォルトで長さ引数と同じ値が設定されているため、省略して、両方を同じ値に設定できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">gophers</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="nx">Gopher</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">gophers</span></code> スライスの長さと容量の両方が10に設定されています。</p>
+</div>
+<div class="section" id="copy">
+<h2>Copy<a class="headerlink" href="#copy" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>前のセクションでスライスの容量を2倍にしたとき、古いデータを新しいスライスにコピーするループを作成しました。Goには、これを簡単にするための組み込み関数 <code class="docutils literal notranslate"><span class="pre">copy</span></code> があります。引数は2つのスライスであり、データを右側の引数から左側の引数にコピーします。コピーを使用するように書き直した例を次に示します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">newSlice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="mi">2</span><span class="o">*</span><span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">))</span>
+<span class="nb">copy</span><span class="p">(</span><span class="nx">newSlice</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">copy</span></code> 関数はスマートです。両方の引数の長さに注意を払いながら、できることだけをコピーします。つまり、コピーする要素の数は、2つのスライスの長さの最小値です。これにより、実装が少しだけ簡略化されます。また <code class="docutils literal notranslate"><span class="pre">copy</span></code> は、コピーした要素の数である整数値を返しますが、常にチェックする必要はありません。</p>
+<p><code class="docutils literal notranslate"><span class="pre">copy</span></code> 関数は、コピー元とコピー先の要素が重なるときにも適切に機能します。つまり、単一のスライス内でアイテムをシフトするために使用できます。<code class="docutils literal notranslate"><span class="pre">copy</span></code> を使用して、スライスの中央に値を挿入する方法を次に示します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Insert inserts the value into the slice at the specified index,</span>
+<span class="c1">// which must be in range.</span>
+<span class="c1">// The slice must have room for the new element.</span>
+<span class="kd">func</span> <span class="nx">Insert</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">index</span><span class="p">,</span> <span class="nx">value</span> <span class="kt">int</span><span class="p">)</span> <span class="p">[]</span><span class="kt">int</span> <span class="p">{</span>
+        <span class="c1">// Grow the slice by one element.</span>
+        <span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">0</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1">// Use copy to move the upper part of the slice out of the way and open a hole.</span>
+        <span class="nb">copy</span><span class="p">(</span><span class="nx">slice</span><span class="p">[</span><span class="nx">index</span><span class="o">+</span><span class="mi">1</span><span class="p">:],</span> <span class="nx">slice</span><span class="p">[</span><span class="nx">index</span><span class="p">:])</span>
+        <span class="c1">// Store the new value.</span>
+        <span class="nx">slice</span><span class="p">[</span><span class="nx">index</span><span class="p">]</span> <span class="p">=</span> <span class="nx">value</span>
+        <span class="c1">// Return the result.</span>
+        <span class="k">return</span> <span class="nx">slice</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>この関数には、注意すべき点がいくつかあります。もちろん、最初に、長さが変更されているため、更新されたスライスを返す必要があります。第二に、便利な略記法を使用します。以下は</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span><span class="p">[</span><span class="nx">i</span><span class="p">:]</span>
+</pre></div>
+</div>
+<p>とまったく同じ意味です。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span><span class="p">[</span><span class="nx">i</span><span class="p">:</span><span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p>また、このトリックはまだ使用していませんが、スライス式の最初の要素も省略できます。デフォルトは0です。よって</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span><span class="p">[:]</span>
+</pre></div>
+</div>
+<p>スライス自体を意味するだけで、配列をスライスするときに便利です。この式は「配列のすべての要素を記述するスライス」と言う最も簡単な方法です。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">array</span><span class="p">[:]</span>
+</pre></div>
+</div>
+<p>これで作業は完了です。<code class="docutils literal notranslate"><span class="pre">Insert</span></code> 関数を実行しましょう。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span> <span class="c1">// Note capacity &gt; length: room to add element.</span>
+<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">slice</span> <span class="p">{</span>
+        <span class="nx">slice</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">i</span>
+<span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+<span class="nx">slice</span> <span class="p">=</span> <span class="nx">Insert</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">99</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p>[訳注]: 以下の結果を得ることができます。</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">99</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span><span class="p">]</span>
+
+<span class="n">Program</span> <span class="n">exited</span><span class="o">.</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="append">
+<h2>Append: 例<a class="headerlink" href="#append" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>数セクション前に、1つの要素でスライスを拡張する <code class="docutils literal notranslate"><span class="pre">Extend</span></code> 関数を作成しました。 ただし、スライスの容量が小さすぎると機能がクラッシュするため、バグがありました。(<code class="docutils literal notranslate"><span class="pre">Insert</span></code> の例にも同じ問題があります。)これを修正するための準備が整ったので、整数スライス用の <code class="docutils literal notranslate"><span class="pre">Extend</span></code> の堅牢な実装を作成しましょう。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Extend</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">element</span> <span class="kt">int</span><span class="p">)</span> <span class="p">[]</span><span class="kt">int</span> <span class="p">{</span>
+        <span class="nx">n</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nx">n</span> <span class="o">==</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span> <span class="p">{</span>
+                <span class="c1">// Slice is full; must grow.</span>
+                <span class="c1">// We double its size and add 1, so if the size is zero we still grow.</span>
+                <span class="nx">newSlice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="mi">2</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+                <span class="nb">copy</span><span class="p">(</span><span class="nx">newSlice</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+                <span class="nx">slice</span> <span class="p">=</span> <span class="nx">newSlice</span>
+        <span class="p">}</span>
+        <span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[</span><span class="mi">0</span> <span class="p">:</span> <span class="nx">n</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="nx">slice</span><span class="p">[</span><span class="nx">n</span><span class="p">]</span> <span class="p">=</span> <span class="nx">element</span>
+        <span class="k">return</span> <span class="nx">slice</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>この場合、スライスを返すことが特に重要です。スライスを再割り当てすると、結果のスライスが完全に異なる配列を記述するためです。スライスがいっぱいになったときに何が起こるかを示すための小さなスニペットを次に示します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">10</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+        <span class="nx">slice</span> <span class="p">=</span> <span class="nx">Extend</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="nx">i</span><span class="p">)</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;len=%d cap=%d slice=%v\n&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">),</span> <span class="nx">slice</span><span class="p">)</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;address of 0th element:&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">slice</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p>[訳注]: 以下の結果を得ることができます。</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">len</span><span class="o">=</span><span class="mi">1</span> <span class="n">cap</span><span class="o">=</span><span class="mi">5</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x456000</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">2</span> <span class="n">cap</span><span class="o">=</span><span class="mi">5</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x456000</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">3</span> <span class="n">cap</span><span class="o">=</span><span class="mi">5</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x456000</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">4</span> <span class="n">cap</span><span class="o">=</span><span class="mi">5</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x456000</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">5</span> <span class="n">cap</span><span class="o">=</span><span class="mi">5</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x456000</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">6</span> <span class="n">cap</span><span class="o">=</span><span class="mi">11</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x454030</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">7</span> <span class="n">cap</span><span class="o">=</span><span class="mi">11</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x454030</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">8</span> <span class="n">cap</span><span class="o">=</span><span class="mi">11</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x454030</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">9</span> <span class="n">cap</span><span class="o">=</span><span class="mi">11</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x454030</span>
+<span class="nb">len</span><span class="o">=</span><span class="mi">10</span> <span class="n">cap</span><span class="o">=</span><span class="mi">11</span> <span class="nb">slice</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span><span class="p">]</span>
+<span class="n">address</span> <span class="n">of</span> <span class="mi">0</span><span class="n">th</span> <span class="n">element</span><span class="p">:</span> <span class="mh">0x454030</span>
+
+<span class="n">Program</span> <span class="n">exited</span><span class="o">.</span>
+</pre></div>
+</div>
+</div>
+<p>サイズ5の初期配列がいっぱいになると、再割り当てに注意してください。新しい配列が割り当てられると、0番目の要素の容量とアドレスが変更されます。</p>
+<p>堅牢な <code class="docutils literal notranslate"><span class="pre">Extend</span></code> 関数をガイドとして使用すると、スライスを複数の要素で拡張できるさらに優れた関数を作成できます。 これを行うには、関数の呼び出し時に関数の引数のリストをスライスに変換するGoの機能を使用します。つまり、Goの可変機能機能を使用します。</p>
+<p>関数 <code class="docutils literal notranslate"><span class="pre">Append</span></code> を呼び出しましょう。最初のバージョンでは <code class="docutils literal notranslate"><span class="pre">Extend</span></code> を繰り返し呼び出すだけで、可変引数関数のメカニズムが明確になります。追加したシグネチャは次のとおりです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Append</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">items</span> <span class="o">...</span><span class="kt">int</span><span class="p">)</span> <span class="p">[]</span><span class="kt">int</span>
+</pre></div>
+</div>
+<p>つまり <code class="docutils literal notranslate"><span class="pre">Append</span></code> は1つの引数(スライス)の後に0個以上の <code class="docutils literal notranslate"><span class="pre">int</span></code> の引数が続くということです。これらの引数は、次のように <code class="docutils literal notranslate"><span class="pre">Append</span></code> の実装に関する限り、<code class="docutils literal notranslate"><span class="pre">int</span></code> のスライスです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Append appends the items to the slice.</span>
+<span class="c1">// First version: just loop calling Extend.</span>
+<span class="kd">func</span> <span class="nx">Append</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">items</span> <span class="o">...</span><span class="kt">int</span><span class="p">)</span> <span class="p">[]</span><span class="kt">int</span> <span class="p">{</span>
+        <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">item</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">items</span> <span class="p">{</span>
+                <span class="nx">slice</span> <span class="p">=</span> <span class="nx">Extend</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="nx">item</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="nx">slice</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">for</span></code> <code class="docutils literal notranslate"><span class="pre">range</span></code> のループが <code class="docutils literal notranslate"><span class="pre">items</span></code> 引数の要素を反復処理していることに注目してください。これは型 <code class="docutils literal notranslate"><span class="pre">[]int</span></code> を暗黙的に示しています。また、ループ内のインデックスを破棄するために空白の識別子 <code class="docutils literal notranslate"><span class="pre">_</span></code> を使用していることに注意してください。この場合はインデックスは必要ありません。</p>
 <p>Try it:</p>
-<p>.play -edit slices/prog120.go /START/,/END/</p>
-<p>Another new technique in this example is that we initialize the slice by writing a composite literal,
-which consists of the type of the slice followed by its elements in braces:</p>
-<p>.code slices/prog120.go /slice := /</p>
-<p>The <cite>Append</cite> function is interesting for another reason.
-Not only can we append elements, we can append a whole second slice
-by &quot;exploding&quot; the slice into arguments using the <cite>...</cite> notation at the call site:</p>
-<p>.play -edit slices/prog130.go /START/,/END/</p>
-<p>Of course, we can make <cite>Append</cite> more efficient by allocating no more than once,
-building on the innards of <cite>Extend</cite>:</p>
-<p>.code slices/prog140.go /Append/,/^}/</p>
-<p>Here, notice how we use <cite>copy</cite> twice, once to move the slice data to the newly
-allocated memory, and then to copy the appending items to the end of the old data.</p>
-<p>Try it; the behavior is the same as before:</p>
-<p>.play -edit slices/prog140.go /START/,/END/</p>
-<ul class="simple">
-<li><p>Append: The built-in function</p></li>
-</ul>
-<hr class="docutils" />
-<p>And so we arrive at the motivation for the design of the <cite>append</cite> built-in function.
-It does exactly what our <cite>Append</cite> example does, with equivalent efficiency, but it
-works for any slice type.</p>
-<p>A weakness of Go is that any generic-type operations must be provided by the
-run-time. Some day that may change, but for now, to make working with slices
-easier, Go provides a built-in generic <cite>append</cite> function.
-It works the same as our <cite>int</cite> slice version, but for _any_ slice type.</p>
-<p>Remember, since the slice header is always updated by a call to <cite>append</cite>, you need
-to save the returned slice after the call.
-In fact, the compiler won't let you call append without saving the result.</p>
-<p>Here are some one-liners intermingled with print statements. Try them, edit them and explore:</p>
-<p>.play -edit slices/prog150.go /START/,/END/</p>
-<p>It's worth taking a moment to think about the final one-liner of that example in detail to understand
-how the design of slices makes it possible for this simple call to work correctly.</p>
-<p>There are lots more examples of <cite>append</cite>, <cite>copy</cite>, and other ways to use slices
-on the community-built
-[[<a class="reference external" href="https://golang.org/wiki/SliceTricks">https://golang.org/wiki/SliceTricks</a>][&quot;Slice Tricks&quot; Wiki page]].</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+<span class="nx">slice</span> <span class="p">=</span> <span class="nx">Append</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>この例のもう1つの新しいテクニックは、複合リテラルを記述することによってスライスを初期化することです。複合リテラルは、スライスのタイプとそれに続く括弧で囲まれた要素で構成されます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Append</span></code> 機能は、別の理由で興味深いものです。要素を追加できるだけでなく、呼び出し側で <code class="docutils literal notranslate"><span class="pre">...</span></code> 表記を使用して、スライスを引数に「展開」することにより、2番目のスライス全体を追加できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice1</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">}</span>
+<span class="nx">slice2</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">55</span><span class="p">,</span> <span class="mi">66</span><span class="p">,</span> <span class="mi">77</span><span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice1</span><span class="p">)</span>
+<span class="nx">slice1</span> <span class="p">=</span> <span class="nx">Append</span><span class="p">(</span><span class="nx">slice1</span><span class="p">,</span> <span class="nx">slice2</span><span class="o">...</span><span class="p">)</span> <span class="c1">// The &#39;...&#39; is essential!</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>もちろん <code class="docutils literal notranslate"><span class="pre">Extend</span></code> の内部に基づいて複数回割り当てることで、<code class="docutils literal notranslate"><span class="pre">Append</span></code> をより効率的にすることができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Append appends the elements to the slice.</span>
+<span class="c1">// Efficient version.</span>
+<span class="kd">func</span> <span class="nx">Append</span><span class="p">(</span><span class="nx">slice</span> <span class="p">[]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">elements</span> <span class="o">...</span><span class="kt">int</span><span class="p">)</span> <span class="p">[]</span><span class="kt">int</span> <span class="p">{</span>
+        <span class="nx">n</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+        <span class="nx">total</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="nx">elements</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nx">total</span> <span class="p">&gt;</span> <span class="nb">cap</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span> <span class="p">{</span>
+                <span class="c1">// Reallocate. Grow to 1.5 times the new size, so we can still grow.</span>
+                <span class="nx">newSize</span> <span class="o">:=</span> <span class="nx">total</span><span class="o">*</span><span class="mi">3</span><span class="o">/</span><span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="nx">newSlice</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">total</span><span class="p">,</span> <span class="nx">newSize</span><span class="p">)</span>
+                <span class="nb">copy</span><span class="p">(</span><span class="nx">newSlice</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+                <span class="nx">slice</span> <span class="p">=</span> <span class="nx">newSlice</span>
+        <span class="p">}</span>
+        <span class="nx">slice</span> <span class="p">=</span> <span class="nx">slice</span><span class="p">[:</span><span class="nx">total</span><span class="p">]</span>
+        <span class="nb">copy</span><span class="p">(</span><span class="nx">slice</span><span class="p">[</span><span class="nx">n</span><span class="p">:],</span> <span class="nx">elements</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nx">slice</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>ここで、<code class="docutils literal notranslate"><span class="pre">copy</span></code> を2回使用する方法に注意してください。1回はスライスデータを新しく割り当てられたメモリに移動し、その後、追加するデータを古いデータの最後にコピーします。</p>
+<p>以下を試してみてください;動作は以前と同じです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice1</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">}</span>
+<span class="nx">slice2</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">55</span><span class="p">,</span> <span class="mi">66</span><span class="p">,</span> <span class="mi">77</span><span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice1</span><span class="p">)</span>
+<span class="nx">slice1</span> <span class="p">=</span> <span class="nx">Append</span><span class="p">(</span><span class="nx">slice1</span><span class="p">,</span> <span class="nx">slice2</span><span class="o">...</span><span class="p">)</span> <span class="c1">// The &#39;...&#39; is essential!</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">slice1</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id7">
+<h2>Append: 組み込み関数<a class="headerlink" href="#id7" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>それで、<code class="docutils literal notranslate"><span class="pre">append</span></code> 組み込み関数の設計の動機に到達します。<code class="docutils literal notranslate"><span class="pre">Append</span></code> の例と同等の効率で正確に機能しますが、どのスライス型でも機能します。</p>
+<p>Goの弱点は、ジェネリック型の操作を実行時に提供する必要があることです。いつか変わる可能性がありますが、現時点では、スライスの操作を簡単にするために、Goには組み込みの汎用 <code class="docutils literal notranslate"><span class="pre">append</span></code> 関数が用意されています。<code class="docutils literal notranslate"><span class="pre">int</span></code> スライスバージョンと同じように機能しますが <strong>すべて</strong> のスライス型に対して機能します。</p>
+<p>スライスヘッダーは <code class="docutils literal notranslate"><span class="pre">append</span></code> の呼び出しによって常に更新されるため、呼び出し後に返されたスライスを保存する必要があることに注意してください。実際、コンパイラーは結果を保存せずに <code class="docutils literal notranslate"><span class="pre">append</span></code> を呼び出すことはできません。</p>
+<p>以下は、printステートメントと混ざったワンライナーです。それらを試して編集し、探索してください：</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a couple of starter slices.</span>
+<span class="nx">slice</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">}</span>
+<span class="nx">slice2</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">55</span><span class="p">,</span> <span class="mi">66</span><span class="p">,</span> <span class="mi">77</span><span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Start slice: &quot;</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Start slice2:&quot;</span><span class="p">,</span> <span class="nx">slice2</span><span class="p">)</span>
+
+<span class="c1">// Add an item to a slice.</span>
+<span class="nx">slice</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Add one item:&quot;</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+
+<span class="c1">// Add one slice to another.</span>
+<span class="nx">slice</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="nx">slice2</span><span class="o">...</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Add one slice:&quot;</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+
+<span class="c1">// Make a copy of a slice (of int).</span>
+<span class="nx">slice3</span> <span class="o">:=</span> <span class="nb">append</span><span class="p">([]</span><span class="nb">int</span><span class="p">(</span><span class="kc">nil</span><span class="p">),</span> <span class="nx">slice</span><span class="o">...</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Copy a slice:&quot;</span><span class="p">,</span> <span class="nx">slice3</span><span class="p">)</span>
+
+<span class="c1">// Copy a slice to the end of itself.</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Before append to self:&quot;</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+<span class="nx">slice</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">slice</span><span class="p">,</span> <span class="nx">slice</span><span class="o">...</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;After append to self:&quot;</span><span class="p">,</span> <span class="nx">slice</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p>[訳注]: 以下の結果を得ることができます。</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Start</span> <span class="nb">slice</span><span class="p">:</span>  <span class="p">[</span><span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">]</span>
+<span class="n">Start</span> <span class="n">slice2</span><span class="p">:</span> <span class="p">[</span><span class="mi">55</span> <span class="mi">66</span> <span class="mi">77</span><span class="p">]</span>
+<span class="n">Add</span> <span class="n">one</span> <span class="n">item</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span><span class="p">]</span>
+<span class="n">Add</span> <span class="n">one</span> <span class="nb">slice</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">55</span> <span class="mi">66</span> <span class="mi">77</span><span class="p">]</span>
+<span class="n">Copy</span> <span class="n">a</span> <span class="nb">slice</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">55</span> <span class="mi">66</span> <span class="mi">77</span><span class="p">]</span>
+<span class="n">Before</span> <span class="n">append</span> <span class="n">to</span> <span class="bp">self</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">55</span> <span class="mi">66</span> <span class="mi">77</span><span class="p">]</span>
+<span class="n">After</span> <span class="n">append</span> <span class="n">to</span> <span class="bp">self</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">55</span> <span class="mi">66</span> <span class="mi">77</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">55</span> <span class="mi">66</span> <span class="mi">77</span><span class="p">]</span>
+
+<span class="n">Program</span> <span class="n">exited</span><span class="o">.</span>
+</pre></div>
+</div>
+</div>
+<p>スライスの設計によってこの単純な呼び出しが正しく機能することを可能にする方法を理解するために、その例の最後のワンライナーについて詳しく考える時間をとる価値があります。</p>
+<p>コミュニティが構築した「 <a class="reference external" href="https://golang.org/wiki/SliceTricks">Slice Trickes</a> 」Wikiページには、スライスの <code class="docutils literal notranslate"><span class="pre">append</span></code>、<code class="docutils literal notranslate"><span class="pre">copy</span></code> 、およびその他の使用方法の例が他にもたくさんあります。</p>
 <ul class="simple">
 <li><p>Nil</p></li>
 </ul>
 <hr class="docutils" />
-<p>As an aside, with our newfound knowledge we can see what the representation of a <cite>nil</cite> slice is.
-Naturally, it is the zero value of the slice header:</p>
-<blockquote>
-<div><dl class="simple">
-<dt>sliceHeader{</dt><dd><p>Length:        0,
-Capacity:      0,
-ZerothElement: nil,</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
-<p>or just</p>
-<blockquote>
-<div><p>sliceHeader{}</p>
-</div></blockquote>
-<p>The key detail is that the element pointer is <cite>nil</cite> too. The slice created by</p>
-<blockquote>
-<div><p>array[0:0]</p>
-</div></blockquote>
-<p>has length zero (and maybe even capacity zero) but its pointer is not <cite>nil</cite>, so
-it is not a nil slice.</p>
-<p>As should be clear, an empty slice can grow (assuming it has non-zero capacity), but a <cite>nil</cite>
-slice has no array to put values in and can never grow to hold even one element.</p>
-<p>That said, a <cite>nil</cite> slice is functionally equivalent to a zero-length slice, even though it points
-to nothing.
-It has length zero and can be appended to, with allocation.
-As an example, look at the one-liner above that copies a slice by appending
-to a <cite>nil</cite> slice.</p>
+<p>余談ですが、私たちの新たな知見により <code class="docutils literal notranslate"><span class="pre">nil</span></code> スライスの表現が何であるかを見ることができます。当然、スライスヘッダーの値はゼロです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">sliceHeader</span><span class="p">{</span>
+        <span class="nx">Length</span><span class="p">:</span>        <span class="mi">0</span><span class="p">,</span>
+        <span class="nx">Capacity</span><span class="p">:</span>      <span class="mi">0</span><span class="p">,</span>
+        <span class="nx">ZerothElement</span><span class="p">:</span> <span class="kc">nil</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>あるいは単に</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">sliceHeader</span><span class="p">{}</span>
+</pre></div>
+</div>
+<p>重要な詳細は、配列の要素へのポインタも <code class="docutils literal notranslate"><span class="pre">nil</span></code> であることです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">array</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">0</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>上記によって作成されたスライスは長さ0(および場合によっては容量0)がありますが、そのポインターは <code class="docutils literal notranslate"><span class="pre">nil</span></code> ではないため、nilスライスではありません。</p>
+<p>明らかなように、空のスライスは大きくなる可能性があります(容量がゼロでないと仮定します)が、<code class="docutils literal notranslate"><span class="pre">nil</span></code> スライスには値を入れる配列がなく、1つの要素を保持するために大きくなることはありません。</p>
+<p>つまり <code class="docutils literal notranslate"><span class="pre">nil</span></code> スライスは、要素へのポインタを保持していない場合でも、機能的に長さが0のスライスと同等です。 長さは0で、割り当てて追加できます。 例として、<code class="docutils literal notranslate"><span class="pre">nil</span></code> スライスに追加してスライスをコピーする上記の1行のライナーを見てください。</p>
 <ul class="simple">
-<li><p>Strings</p></li>
+<li><p>文字列(Strings)</p></li>
 </ul>
 <hr class="docutils" />
-<p>Now a brief section about strings in Go in the context of slices.</p>
-<p>Strings are actually very simple: they are just read-only slices of bytes with a bit
-of extra syntactic support from the language.</p>
-<p>Because they are read-only, there is no need for a capacity (you can't grow them),
-but otherwise for most purposes you can treat them just like read-only slices
-of bytes.</p>
-<p>For starters, we can index them to access individual bytes:</p>
-<blockquote>
-<div><p>slash := &quot;/usr/ken&quot;[0] // yields the byte value '/'.</p>
-</div></blockquote>
-<p>We can slice a string to grab a substring:</p>
-<blockquote>
-<div><p>usr := &quot;/usr/ken&quot;[0:4] // yields the string &quot;/usr&quot;</p>
-</div></blockquote>
-<p>It should be obvious now what's going on behind the scenes when we slice a string.</p>
-<p>We can also take a normal slice of bytes and create a string from it with the simple conversion:</p>
-<blockquote>
-<div><p>str := string(slice)</p>
-</div></blockquote>
-<p>and go in the reverse direction as well:</p>
-<blockquote>
-<div><p>slice := []byte(usr)</p>
-</div></blockquote>
-<p>The array underlying a string is hidden from view; there is no way to access its contents
-except through the string. That means that when we do either of these conversions, a
-copy of the array must be made.
-Go takes care of this, of course, so you don't have to.
-After either of these conversions, modifications to
-the array underlying the byte slice don't affect the corresponding string.</p>
-<p>An important consequence of this slice-like design for strings is that
-creating a substring is very efficient.
-All that needs to happen
-is the creation of a two-word string header. Since the string is read-only, the original
-string and the string resulting from the slice operation can share the same array safely.</p>
-<p>A historical note: The earliest implementation of strings always allocated, but when slices
-were added to the language, they provided a model for efficient string handling. Some of
-the benchmarks saw huge speedups as a result.</p>
-<p>There's much more to strings, of course, and a
-[[<a class="reference external" href="https://blog.golang.org/strings][separate">https://blog.golang.org/strings][separate</a> blog post]] covers them in greater depth.</p>
+<p>スライスのコンテキストにおけるGoの文字列に関する簡単なセクションです。</p>
+<p>文字列は実際には非常に単純です。文字列は読み取り専用のバイトスライスであり、言語からの余分な構文サポートが少しあります。</p>
+<p>これらは読み取り専用であるため、容量は必要ありません(容量を増やすことはできません)が、それ以外の場合はほとんどの目的で、読み取り専用のバイトスライスのように扱うことができます。</p>
+<p>まず、個々のバイトにアクセスするためにインデックスを作成できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slash</span> <span class="o">:=</span> <span class="s">&quot;/usr/ken&quot;</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="c1">// yields the byte value &#39;/&#39;.</span>
+</pre></div>
 </div>
-<div class="section" id="id8">
-<h2>結論<a class="headerlink" href="#id8" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>To understand how slices work, it helps to understand how they are implemented.
-There is a little data structure, the slice header, that is the item associated with the slice
-variable, and that header describes a section of a separately allocated array.
-When we pass slice values around, the header gets copied but the array it points
-to is always shared.</p>
-<p>Once you appreciate how they work, slices become not only easy to use, but
-powerful and expressive, especially with the help of the <cite>copy</cite> and <cite>append</cite>
-built-in functions.</p>
+<p>文字列をスライスして部分文字列を取得できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">usr</span> <span class="o">:=</span> <span class="s">&quot;/usr/ken&quot;</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="c1">// yields the string &quot;/usr&quot;</span>
+</pre></div>
+</div>
+<p>これで、文字列をスライスしたときに裏で何が起こっているかが明らかになります。</p>
+<p>通常のバイトスライスを取得し、単純な変換を使用して、そこから文字列を作成することもできます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">str</span> <span class="o">:=</span> <span class="nb">string</span><span class="p">(</span><span class="nx">slice</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>そして逆のこともできます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">slice</span> <span class="o">:=</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="nx">usr</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>文字列の基になる配列はビューから隠されています。stringを使用しない限り、そのコンテンツにアクセスする方法はありません。つまり、これらの変換のいずれかを行う場合、配列のコピーを作成する必要があります。もちろん、Goがこれを処理するので、必要はありません。これらの変換のいずれかの後、バイトスライスの基になる配列への変更は、対応する文字列に影響しません。</p>
+<p>この文字列のスライスのような設計の重要な結果は、部分文字列の作成が非常に効率的であることです。発生する必要があるのは、2ワードの文字列ヘッダーを作成することだけです。文字列は読み取り専用であるため、元の文字列とスライス操作の結果の文字列は同じ配列を安全に共有できます。</p>
+<p>歴史的なメモ：文字列の初期実装は常に割り当てられますが、言語にスライスが追加されると、文字列を効率的に処理するためのモデルが提供されました。一部のベンチマークでは、結果として大幅な高速化が見られました。</p>
+<p>もちろん、文字列にはさらに多くのものがあり、<a class="reference external" href="https://blog.golang.org/strings">別のブログ投稿</a> で文字列の詳細を説明しています。</p>
 </div>
 <div class="section" id="id9">
-<h2>さらに読むために<a class="headerlink" href="#id9" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>There's lots to find around the intertubes about slices in Go.
-As mentioned earlier,
-the [[<a class="reference external" href="https://golang.org/wiki/SliceTricks">https://golang.org/wiki/SliceTricks</a>][&quot;Slice Tricks&quot; Wiki page]]
-has many examples.
-The [[<a class="reference external" href="https://blog.golang.org/go-slices-usage-and-internals][Go">https://blog.golang.org/go-slices-usage-and-internals][Go</a> Slices]] blog post
-describes the memory layout details with clear diagrams.
-Russ Cox's [[<a class="reference external" href="https://research.swtch.com/godata][Go">https://research.swtch.com/godata][Go</a> Data Structures]] article includes
-a discussion of slices along with some of Go's other internal data structures.</p>
-<p>There is much more material available, but the best way to learn about slices is to use them.</p>
+<h2>結論<a class="headerlink" href="#id9" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>スライスの仕組みを理解するには、スライスの実装方法を理解することが役立ちます。スライスヘッダーという小さなデータ構造があります。これは、スライス変数に関連付けられたアイテムです。このヘッダーは、個別に割り当てられた配列のセクションを記述します。 スライス値を渡すと、ヘッダーがコピーされますが、ヘッダーが指す配列は常に共有されます。</p>
+<p>スライスがどのように機能するかを理解すると、スライスは使いやすくなるだけでなく、特に組み込み関数の <code class="docutils literal notranslate"><span class="pre">copy</span></code> と <code class="docutils literal notranslate"><span class="pre">append</span></code> の助けを借りて、強力で表現力豊かになります。</p>
+</div>
+<div class="section" id="id10">
+<h2>さらに読むために<a class="headerlink" href="#id10" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>Goのスライスに関するintertubesの周りには、たくさんの発見があります。 前述のように、「 <a class="reference external" href="https://golang.org/wiki/SliceTricks">Slice Trickes</a> 」Wikiページには多くの例があります。 <a class="reference external" href="https://blog.golang.org/go-slices-usage-and-internals">Go Slices</a> のブログ投稿では、メモリレイアウトの詳細をわかりやすい図で説明しています。 Russ Coxの <a class="reference external" href="https://research.swtch.com/godata">Go Data Structures</a> の記事には、Goの他の内部データ構造の一部とともにスライスの説明が含まれています。</p>
+<div class="admonition-todo admonition" id="id12">
+<p class="admonition-title">課題</p>
+<p>intertubes の意味がわからない</p>
+</div>
+<p>より多くの資料が利用可能ですが、スライスについて学ぶ最良の方法はそれらを使用することです。</p>
 </div>
 </div>
 
