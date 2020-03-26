@@ -153,8 +153,8 @@
 </pre></div>
 </div>
 </div>
-<div class="section" id="simplifying-repetitive-error-handling">
-<h2>Simplifying repetitive error handling<a class="headerlink" href="#simplifying-repetitive-error-handling" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<div class="section" id="id2">
+<h2>繰り返されるエラーのシンプル化<a class="headerlink" href="#id2" title="このヘッドラインへのパーマリンク">¶</a></h2>
 <p>Go では、エラー処理が重要です。この言語の設計と規約は、エラーが発生した場合に明示的にチェックすることを奨励しています (他の言語では例外を投げたり、時にはキャッチしたりする慣習とは異なります)。このため、Go のコードが冗長になってしまう場合がありますが、幸いにも、繰り返しのエラー処理を最小限に抑えるために使用できるテクニックがいくつかあります。</p>
 <p>データストアからレコードを取得し、テンプレートでフォーマットする HTTP ハンドラを持つ App Engine アプリケーションを考えてみましょう。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">init</span><span class="p">()</span> <span class="p">{</span>
@@ -255,8 +255,8 @@
 <li><p>appHandler 内のパニックから回復し「重大なエラーが発生しました」とユーザーに通知しながら、エラーを「Critical」としてコンソールに記録します。 これは、プログラミングエラーによって引き起こされた不可解なエラーメッセージにユーザーがさらされないようにするための良い方法です。 詳細については、<a class="reference external" href="https://blog.golang.org/defer-panic-and-recover">Defer, Panic, and Recover</a> の記事を参照してください。</p></li>
 </ul>
 </div>
-<div class="section" id="id2">
-<h2>結論<a class="headerlink" href="#id2" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<div class="section" id="id3">
+<h2>結論<a class="headerlink" href="#id3" title="このヘッドラインへのパーマリンク">¶</a></h2>
 <p>適切なエラー処理は、優れたソフトウェアの必須要件です。 この投稿で説明されている手法を採用することで、より信頼性が高く簡潔な Go コードを記述できるようになります。</p>
 </div>
 </div>
