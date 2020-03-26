@@ -103,7 +103,7 @@
 </pre></div>
 </div>
 <p>多くの場合、fmt.Errorf で十分ですが、エラーはインターフェースなので、任意のデータ構造をエラー値として使用して、呼び出し元がエラーの詳細を調べることができます。</p>
-<p>例えば、仮に呼び出し側は Sqrt に渡された無効な引数を回復したいと思うかもしれません。これを可能にするには、errors.errorString を使用する代わりに新しいエラー実装を定義します。</p>
+<p>例えば、仮に呼び出し側は Sqrt に渡された無効な引数を回復したいと思うかもしれません。これを可能にするには、errors.errorString を使用する代わりに新しく Error() を実装します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">NegativeSqrtError</span> <span class="kt">float64</span>
 
 <span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="nx">NegativeSqrtError</span><span class="p">)</span> <span class="nx">Error</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span>
