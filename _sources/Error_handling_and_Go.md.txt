@@ -74,7 +74,7 @@ if err != nil {
 }
 ```
 
-[fmt](https://golang.org/pkg/fmt/) パッケージは Error() string メソッドを呼び出すことでエラー値を整えます。
+[fmt](https://golang.org/pkg/fmt/) パッケージは Error() string メソッドを呼び出すことでエラー値をフォーマットします。
 
 コンテキストを要約するのはエラーの実装者の責任です。os.Open が返すエラーは "open /etc/passwd: permission denied" という形式で、"permission denied" だけではありません。私たちの Sqrt によって返されるエラーは、無効な引数に関する情報を欠いています。
 

@@ -94,7 +94,7 @@
 <span class="p">}</span>
 </pre></div>
 </div>
-<p><a class="reference external" href="https://golang.org/pkg/fmt/">fmt</a> パッケージは Error() string メソッドを呼び出すことでエラー値を整えます。</p>
+<p><a class="reference external" href="https://golang.org/pkg/fmt/">fmt</a> パッケージは Error() string メソッドを呼び出すことでエラー値をフォーマットします。</p>
 <p>コンテキストを要約するのはエラーの実装者の責任です。os.Open が返すエラーは &quot;open /etc/passwd: permission denied&quot; という形式で、&quot;permission denied&quot; だけではありません。私たちの Sqrt によって返されるエラーは、無効な引数に関する情報を欠いています。</p>
 <p>その情報を追加するには、fmt パッケージの Errorf が便利です。これは、Printf の規則に従って文字列をフォーマットし、errors.New によって生成されたエラーとして返します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="nx">f</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
