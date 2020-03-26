@@ -15,7 +15,7 @@
     <script src="_static/translations.js"></script>
     <link rel="index" title="索引" href="genindex.html" />
     <link rel="search" title="検索" href="search.html" />
-    <link rel="prev" title="Go Slices: usage and internals" href="slices_usage_and_internals.html" />
+    <link rel="prev" title="Error handling and Go" href="Error_handling_and_Go.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -36,25 +36,25 @@
 <h1>TODO(内部用)<a class="headerlink" href="#todo" title="このヘッドラインへのパーマリンク">¶</a></h1>
 <p>内部的なTODOです。</p>
 <div class="admonition-todo admonition">
-<a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><p class="admonition-title">課題</p>
+<p class="admonition-title">課題</p>
 <p>ちょっと違和感がある。</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">Context</span></code> associated with an incoming request is typically canceled when the request handler returns.</p>
 </div>
 <p class="todo-source">(<a class="reference internal" href="context.html#id3"><em>元のエントリ</em></a> は、 /home/runner/work/go-blog-ja/go-blog-ja/source/context.rst の 74 行目です)</p>
 <div class="admonition-todo admonition">
-<a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><p class="admonition-title">課題</p>
+<p class="admonition-title">課題</p>
 <p>訳がわからない</p>
 <p>It seems clumsy in that example, especially dealing with the extra level of indirection (a temporary variable helps)</p>
 <p>上記の例では、特に余計な間接参照のレベルを扱う場合(一時的な変数が役たちます)ぎこちないように見えます。</p>
 </div>
 <p class="todo-source">(<a class="reference internal" href="slices.html#id6"><em>元のエントリ</em></a> は、 /home/runner/work/go-blog-ja/go-blog-ja/source/slices.rst の 215 行目です)</p>
 <div class="admonition-todo admonition">
-<a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><p class="admonition-title">課題</p>
+<p class="admonition-title">課題</p>
 <p>intertubes の意味がわからない</p>
 </div>
 <p class="todo-source">(<a class="reference internal" href="slices.html#id12"><em>元のエントリ</em></a> は、 /home/runner/work/go-blog-ja/go-blog-ja/source/slices.rst の 769 行目です)</p>
 <div class="admonition-todo admonition">
-<a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><p class="admonition-title">課題</p>
+<p class="admonition-title">課題</p>
 <p>どのように訳すと自然か。</p>
 <p>A slice is a descriptor of an array segment. It consists of a pointer to
 the array, the length of the segment, and its capacity (the maximum
@@ -62,7 +62,7 @@ length of the segment).</p>
 </div>
 <p class="todo-source">(<a class="reference internal" href="slices_usage_and_internals.html#id4"><em>元のエントリ</em></a> は、 /home/runner/work/go-blog-ja/go-blog-ja/source/slices_usage_and_internals.rst の 118 行目です)</p>
 <div class="admonition-todo admonition">
-<a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><p class="admonition-title">課題</p>
+<p class="admonition-title">課題</p>
 <p>slice の grown は成長と訳すのがいいのかどうか。</p>
 <p><code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> などの関数は、スライスの成長方法を完全に制御できるため便利です。</p>
 <p>Functions like <code class="docutils literal notranslate"><span class="pre">AppendByte</span></code> are useful because they offer complete control over the way the slice is grown.</p>
@@ -82,6 +82,7 @@ length of the segment).</p>
 <li class="toctree-l1"><a class="reference internal" href="context.html">Go Concurrency Patterns: Context</a></li>
 <li class="toctree-l1"><a class="reference internal" href="slices.html">Arrays, slices (and strings): The mechanics of 'append'</a></li>
 <li class="toctree-l1"><a class="reference internal" href="slices_usage_and_internals.html">Go Slices: usage and internals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html">Error handling and Go</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">TODO(内部用)</a></li>
@@ -108,7 +109,7 @@ length of the segment).</p>
       &copy;VividCortex (translated by @d-tsuji).
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.1</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.4</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

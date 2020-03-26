@@ -1,0 +1,315 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>Error handling and Go &#8212; Go database/sql tutorial  ドキュメント</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="検索" href="search.html" />
+    <link rel="next" title="TODO(内部用)" href="todo.html" />
+    <link rel="prev" title="Go Slices: usage and internals" href="slices_usage_and_internals.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><div class="section" id="error-handling-and-go">
+<h1>Error handling and Go<a class="headerlink" href="#error-handling-and-go" title="このヘッドラインへのパーマリンク">¶</a></h1>
+<div class="section" id="id1">
+<h2>概要<a class="headerlink" href="#id1" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>Go コードを書いたことがある人なら、組み込みのエラー型を見たことがあるでしょう。Go のコードは、異常な状態を示すためにエラー値を使用します。例えば、os.Open 関数は、ファイルを開くのに失敗した場合、nil 以外のエラー値を返します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Open</span><span class="p">(</span><span class="nx">name</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="nx">file</span> <span class="o">*</span><span class="nx">File</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>以下のコードは os.Open を使ってファイルを開いています。エラーが発生した場合は log.Fatal を呼び出してエラーメッセージを表示して停止します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">f</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Open</span><span class="p">(</span><span class="s">&quot;filename.ext&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="c1">// do something with the open *File f</span>
+</pre></div>
+</div>
+<p>この記事では、エラー型について知っておくだけで、Go で多くのことができるようになりますが、この記事では、エラーについて詳しく見ていき、Go でのエラー処理のための良い方法について説明します。</p>
+</div>
+<div class="section" id="error">
+<h2>error型<a class="headerlink" href="#error" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>エラー型はインタフェース型です。エラーの変数は、それ自体は文字列を記述できる任意の値を表します。以下はインターフェイスの宣言です。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="kt">error</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">Error</span><span class="p">()</span> <span class="kt">string</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>エラー型は、すべての組み込み型と同様に、ユニバースブロックで事前に宣言されています。</p>
+<p>最も一般的に使用されるエラーの実装は、errors パッケージの非公開の errorString 型です。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// errorString is a trivial implementation of error.</span>
+<span class="kd">type</span> <span class="nx">errorString</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">s</span> <span class="kt">string</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">e</span> <span class="o">*</span><span class="nx">errorString</span><span class="p">)</span> <span class="nx">Error</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">e</span><span class="p">.</span><span class="nx">s</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>これらの値のいずれかを作成するには、errors.New 関数を使用します。これは文字列を受け取り、それを errors.errorString に変換してエラー値として返します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// New returns an error that formats as the given text.</span>
+<span class="kd">func</span> <span class="nx">New</span><span class="p">(</span><span class="nx">text</span> <span class="kt">string</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="o">&amp;</span><span class="nx">errorString</span><span class="p">{</span><span class="nx">text</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>ここでは、error.New を使用方法を説明します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Sqrt</span><span class="p">(</span><span class="nx">f</span> <span class="kt">float64</span><span class="p">)</span> <span class="p">(</span><span class="kt">float64</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">f</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">errors</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="s">&quot;math: square root of negative number&quot;</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="c1">// implementation</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Sqrt に負の引数を渡す呼び出し元は、nil ではないエラー値を受け取ります（その具体的な表現は errors.errorString 値です）。呼び出し元は、エラーの Error メソッドを呼び出すか、エラー文字列(&quot;math: square root of....&quot;)を単に表示することができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">f</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">Sqrt</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><a class="reference external" href="https://golang.org/pkg/fmt/">fmt</a> パッケージは Error() string メソッドを呼び出すことでエラー値を整えます。</p>
+<p>コンテキストを要約するのはエラーの実装者の責任です。os.Open が返すエラーは &quot;open /etc/passwd: permission denied&quot; という形式で、&quot;permission denied&quot; だけではありません。私たちの Sqrt によって返されるエラーは、無効な引数に関する情報を欠いています。</p>
+<p>その情報を追加するには、fmt パッケージの Errorf が便利です。これは、Printf の規則に従って文字列をフォーマットし、errors.New によって生成されたエラーとして返します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="nx">f</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;math: square root of negative number %g&quot;</span><span class="p">,</span> <span class="nx">f</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>多くの場合、fmt.Errorf で十分ですが、エラーはインターフェースなので、任意のデータ構造をエラー値として使用して、呼び出し元がエラーの詳細を調べることができます。</p>
+<p>例えば、仮に呼び出し側は Sqrt に渡された無効な引数を回復したいと思うかもしれません。これを可能にするには、errors.errorString を使用する代わりに新しいエラー実装を定義します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">NegativeSqrtError</span> <span class="kt">float64</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="nx">NegativeSqrtError</span><span class="p">)</span> <span class="nx">Error</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprintf</span><span class="p">(</span><span class="s">&quot;math: square root of negative number %g&quot;</span><span class="p">,</span> <span class="nb">float64</span><span class="p">(</span><span class="nx">f</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>洗練された呼び出し元は、<a class="reference external" href="https://golang.org/ref/spec#Type_assertions">型アサーション</a>を使用して NegativeSqrtError をチェックして特別に処理することができますが、エラーを fmt.Println や log.Fatal に渡すだけの呼び出し元では動作に変化はありません。</p>
+<p>別の例として、<a class="reference external" href="https://golang.org/pkg/encoding/json/">json</a> パッケージでは、JSON blob を解析する際に構文エラーが発生した場合に json.Decode 関数が返す SyntaxError 型を指定しています。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">SyntaxError</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">msg</span>    <span class="kt">string</span> <span class="c1">// description of error</span>
+    <span class="nx">Offset</span> <span class="kt">int64</span>  <span class="c1">// error occurred after reading Offset bytes</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">e</span> <span class="o">*</span><span class="nx">SyntaxError</span><span class="p">)</span> <span class="nx">Error</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">e</span><span class="p">.</span><span class="nx">msg</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p>Offset フィールドはエラーのデフォルトのフォーマットにはありませんが、呼び出し元はこれを使用してエラーメッセージにファイルや行の情報を追加することができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">dec</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">val</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">serr</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">err</span><span class="p">.(</span><span class="o">*</span><span class="nx">json</span><span class="p">.</span><span class="nx">SyntaxError</span><span class="p">);</span> <span class="nx">ok</span> <span class="p">{</span>
+        <span class="nx">line</span><span class="p">,</span> <span class="nx">col</span> <span class="o">:=</span> <span class="nx">findLine</span><span class="p">(</span><span class="nx">f</span><span class="p">,</span> <span class="nx">serr</span><span class="p">.</span><span class="nx">Offset</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;%s:%d:%d: %v&quot;</span><span class="p">,</span> <span class="nx">f</span><span class="p">.</span><span class="nx">Name</span><span class="p">(),</span> <span class="nx">line</span><span class="p">,</span> <span class="nx">col</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">err</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>(これは <a class="reference external" href="https://perkeep.org/">Camlistore</a> プロジェクトの<a class="reference external" href="https://github.com/go4org/go4/blob/03efcb870d84809319ea509714dd6d19a1498483/jsonconfig/eval.go#L123-L135">実際のコード</a>を少し簡略化したものです)</p>
+<p>error インターフェースは Error メソッドのみを必要とします。例えば、net パッケージは通常の慣習に従ってエラー型のエラーを返しますが、いくつかのエラー実装は net.Error インターフェースで定義された追加のメソッドを持っています。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kn">package</span> <span class="nx">net</span>
+
+<span class="kd">type</span> <span class="nx">Error</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="kt">error</span>
+    <span class="nx">Timeout</span><span class="p">()</span> <span class="kt">bool</span>   <span class="c1">// Is the error a timeout?</span>
+    <span class="nx">Temporary</span><span class="p">()</span> <span class="kt">bool</span> <span class="c1">// Is the error temporary?</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>クライアントコードは net.Error を型アサーションでテストし、一時的なネットワークエラーと恒久的なエラーを区別することができます。例えば、ウェブクローラーは一時的なエラーに遭遇したときにスリープしてリトライし、そうでなければ処理をやめるかもしれません。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="nx">nerr</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">err</span><span class="p">.(</span><span class="nx">net</span><span class="p">.</span><span class="nx">Error</span><span class="p">);</span> <span class="nx">ok</span> <span class="o">&amp;&amp;</span> <span class="nx">nerr</span><span class="p">.</span><span class="nx">Temporary</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">time</span><span class="p">.</span><span class="nx">Sleep</span><span class="p">(</span><span class="mf">1e9</span><span class="p">)</span>
+    <span class="k">continue</span>
+<span class="p">}</span>
+<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="simplifying-repetitive-error-handling">
+<h2>Simplifying repetitive error handling<a class="headerlink" href="#simplifying-repetitive-error-handling" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>Go では、エラー処理が重要です。この言語の設計と規約は、エラーが発生した場合に明示的にチェックすることを奨励しています (他の言語では例外を投げたり、時にはキャッチしたりする慣習とは異なります)。このため、Go のコードが冗長になってしまう場合がありますが、幸いにも、繰り返しのエラー処理を最小限に抑えるために使用できるテクニックがいくつかあります。</p>
+<p>データストアからレコードを取得し、テンプレートでフォーマットする HTTP ハンドラを持つ App Engine アプリケーションを考えてみましょう。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">init</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">http</span><span class="p">.</span><span class="nx">HandleFunc</span><span class="p">(</span><span class="s">&quot;/view&quot;</span><span class="p">,</span> <span class="nx">viewRecord</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">viewRecord</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">c</span> <span class="o">:=</span> <span class="nx">appengine</span><span class="p">.</span><span class="nx">NewContext</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+    <span class="nx">key</span> <span class="o">:=</span> <span class="nx">datastore</span><span class="p">.</span><span class="nx">NewKey</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="s">&quot;Record&quot;</span><span class="p">,</span> <span class="nx">r</span><span class="p">.</span><span class="nx">FormValue</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+    <span class="nx">record</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">Record</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">datastore</span><span class="p">.</span><span class="nx">Get</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">record</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">http</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">Error</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">viewTemplate</span><span class="p">.</span><span class="nx">Execute</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">record</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">http</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">Error</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>この関数は datastore.Get 関数と viewTemplate の Execute メソッドから返されるエラーを処理します。どちらの場合も、HTTPステータスコード500（&quot;Internal Server Error&quot;）のシンプルなエラーメッセージをユーザーに表示します。これは管理しやすいコード量のように見えますが、さらにいくつかの HTTP ハンドラを追加すると、同じエラー処理コードのコピーがたくさん出てきてしまいます。</p>
+<p>同じ記述を減らすために、エラーの戻り値を含む独自の HTTP appHandler タイプを定義することができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">appHandler</span> <span class="kd">func</span><span class="p">(</span><span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="kt">error</span>
+</pre></div>
+</div>
+<p>そして、エラーを返す viewRecord 関数を変更することができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">viewRecord</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="nx">c</span> <span class="o">:=</span> <span class="nx">appengine</span><span class="p">.</span><span class="nx">NewContext</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+    <span class="nx">key</span> <span class="o">:=</span> <span class="nx">datastore</span><span class="p">.</span><span class="nx">NewKey</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="s">&quot;Record&quot;</span><span class="p">,</span> <span class="nx">r</span><span class="p">.</span><span class="nx">FormValue</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+    <span class="nx">record</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">Record</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">datastore</span><span class="p">.</span><span class="nx">Get</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">record</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">err</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">viewTemplate</span><span class="p">.</span><span class="nx">Execute</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">record</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>これは元のバージョンよりもシンプルですが、http パッケージはエラーを返す関数を理解していません。これを修正するには、http.Handler インターフェースの ServeHTTP メソッドを appHandler に実装します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="p">(</span><span class="nx">fn</span> <span class="nx">appHandler</span><span class="p">)</span> <span class="nx">ServeHTTP</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">fn</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">r</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">http</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">Error</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>ServeHTTP メソッドは appHandler 関数を呼び出し、返されたエラー (がもしあれば) をユーザに表示します。メソッドのレシーバである fn は関数であることに注意してください (Go はこれを実行できます！)。メソッドは、式 fn(w, r) でレシーバーを呼び出すことで関数を呼び出します。</p>
+<p>現在、http パッケージで viewRecord を登録する際には、appHandlerはhttp.Handler（http.HandlerFunc ではない）なので、Handle 関数（HandleFuncではなく）を使用しています。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">init</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">http</span><span class="p">.</span><span class="nx">Handle</span><span class="p">(</span><span class="s">&quot;/view&quot;</span><span class="p">,</span> <span class="nx">appHandler</span><span class="p">(</span><span class="nx">viewRecord</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>このような基本的なエラー処理の基盤が整備されていれば、よりユーザーフレンドリーなものにすることができます。単にエラー文字列を表示するのではなく、適切な HTTP ステータスコードを含むシンプルなエラーメッセージをユーザーに表示し、同時にデバッグ目的のために完全なエラーを App Engine の開発者コンソールにロギングする方が良いでしょう。</p>
+<p>これを実現するために、エラーとその他のフィールドを含む appError 構造体を作成します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">appError</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Error</span>   <span class="kt">error</span>
+    <span class="nx">Message</span> <span class="kt">string</span>
+    <span class="nx">Code</span>    <span class="kt">int</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>次に、*appError の値を返すように appHandler の型を変更します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">appHandler</span> <span class="kd">func</span><span class="p">(</span><span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="o">*</span><span class="nx">appError</span>
+</pre></div>
+</div>
+<p>(通常、<a class="reference external" href="https://golang.org/doc/faq#nil_error">Go FAQ</a>で説明されている理由から、エラーではなくエラーの具体的なタイプを渡すのは間違いですが、ServeHTTP は値を見てその内容を使用する唯一の場所なので、ここではそれが正しいことです)。</p>
+<p>そして、appHandler の ServeHTTP メソッドに appError のメッセージを正しい HTTP ステータスコードでユーザーに表示させ、エラー全体を開発者コンソールに記録させます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="p">(</span><span class="nx">fn</span> <span class="nx">appHandler</span><span class="p">)</span> <span class="nx">ServeHTTP</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">e</span> <span class="o">:=</span> <span class="nx">fn</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">r</span><span class="p">);</span> <span class="nx">e</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span> <span class="c1">// e is *appError, not os.Error.</span>
+        <span class="nx">c</span> <span class="o">:=</span> <span class="nx">appengine</span><span class="p">.</span><span class="nx">NewContext</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+        <span class="nx">c</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;%v&quot;</span><span class="p">,</span> <span class="nx">e</span><span class="p">.</span><span class="nx">Error</span><span class="p">)</span>
+        <span class="nx">http</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">e</span><span class="p">.</span><span class="nx">Message</span><span class="p">,</span> <span class="nx">e</span><span class="p">.</span><span class="nx">Code</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>最後に、viewRecord を新しい関数のシグネチャに更新し、エラーが発生した場合にはより多くのコンテキストを返すようにしています。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">viewRecord</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="o">*</span><span class="nx">appError</span> <span class="p">{</span>
+    <span class="nx">c</span> <span class="o">:=</span> <span class="nx">appengine</span><span class="p">.</span><span class="nx">NewContext</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+    <span class="nx">key</span> <span class="o">:=</span> <span class="nx">datastore</span><span class="p">.</span><span class="nx">NewKey</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="s">&quot;Record&quot;</span><span class="p">,</span> <span class="nx">r</span><span class="p">.</span><span class="nx">FormValue</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+    <span class="nx">record</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">Record</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">datastore</span><span class="p">.</span><span class="nx">Get</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">record</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="o">&amp;</span><span class="nx">appError</span><span class="p">{</span><span class="nx">err</span><span class="p">,</span> <span class="s">&quot;Record not found&quot;</span><span class="p">,</span> <span class="mi">404</span><span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">viewTemplate</span><span class="p">.</span><span class="nx">Execute</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">record</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="o">&amp;</span><span class="nx">appError</span><span class="p">{</span><span class="nx">err</span><span class="p">,</span> <span class="s">&quot;Can&#39;t display record&quot;</span><span class="p">,</span> <span class="mi">500</span><span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>このバージョンの viewRecord はオリジナルと同じ長さですが、それぞれの行が特定の意味を持ち、より親しみやすいユーザー体験を提供しています。</p>
+<p>これで終わりではなく、アプリケーションのエラー処理をさらに改善することができます。いくつかのアイデアを紹介します。</p>
+<ul class="simple">
+<li><p>エラーハンドラにきれいな HTML テンプレートを与えます。</p></li>
+<li><p>ユーザーが管理者である場合を考えて、HTTP レスポンスにスタックトレースを書き込むことで、デバッグを容易にします。</p></li>
+<li><p>デバッグを容易にするために、スタックトレースを保存する appError のコンストラクタ関数を書きます。</p></li>
+<li><p>appHandler 内のパニックから回復し「重大なエラーが発生しました」とユーザーに通知しながら、エラーを「Critical」としてコンソールに記録します。 これは、プログラミングエラーによって引き起こされた不可解なエラーメッセージにユーザーがさらされないようにするための良い方法です。 詳細については、<a class="reference external" href="https://blog.golang.org/defer-panic-and-recover">Defer, Panic, and Recover</a> の記事を参照してください。</p></li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h2>結論<a class="headerlink" href="#id2" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>適切なエラー処理は、優れたソフトウェアの必須要件です。 この投稿で説明されている手法を採用することで、より信頼性が高く簡潔な Go コードを記述できるようになります。</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div id="toc" class="sidebarRow">
+    <h5><a href="index.html">The Go Blog</a></h5>
+    <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="context.html">Go Concurrency Patterns: Context</a></li>
+<li class="toctree-l1"><a class="reference internal" href="slices.html">Arrays, slices (and strings): The mechanics of 'append'</a></li>
+<li class="toctree-l1"><a class="reference internal" href="slices_usage_and_internals.html">Go Slices: usage and internals</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Error handling and Go</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="todo.html">TODO(内部用)</a></li>
+</ul>
+
+    
+</div>
+
+<style type="text/css">
+    .toctree-l1 {
+        font-size: 12px;
+        margin-bottom: 0;
+        font-stretch: normal;
+        font-style: normal;
+        line-height: 1.33;
+        padding-bottom: 5px;
+        margin: 2px;
+    }
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;VividCortex (translated by @d-tsuji).
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.4</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/Error_handling_and_Go.md.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
