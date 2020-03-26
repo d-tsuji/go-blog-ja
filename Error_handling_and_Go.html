@@ -37,7 +37,7 @@
 <h1>Error handling and Go<a class="headerlink" href="#error-handling-and-go" title="このヘッドラインへのパーマリンク">¶</a></h1>
 <div class="section" id="id1">
 <h2>概要<a class="headerlink" href="#id1" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>Go コードを書いたことがある人なら、組み込みのエラー型を見たことがあるでしょう。Go のコードは、異常な状態を示すためにエラー値を使用します。例えば、os.Open 関数は、ファイルを開くのに失敗した場合、nil 以外のエラー値を返します。</p>
+<p>Go コードを書いたことがある人なら、組み込みの error 型を見たことがあるでしょう。Go のコードは、異常な状態を示すためにエラー値を使用します。例えば、os.Open 関数は、ファイルを開くのに失敗した場合、nil 以外のエラー値を返します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Open</span><span class="p">(</span><span class="nx">name</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="nx">file</span> <span class="o">*</span><span class="nx">File</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -49,18 +49,18 @@
 <span class="c1">// do something with the open *File f</span>
 </pre></div>
 </div>
-<p>この記事では、エラー型について知っておくだけで、Go で多くのことができるようになりますが、この記事では、エラーについて詳しく見ていき、Go でのエラー処理のための良い方法について説明します。</p>
+<p>この記事では、error 型について知っておくだけで、Go で多くのことができるようになりますが、この記事では、エラーについて詳しく見ていき、Go でのエラー処理のための良い方法について説明します。</p>
 </div>
 <div class="section" id="error">
 <h2>error型<a class="headerlink" href="#error" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>エラー型はインタフェース型です。エラーの変数は、それ自体は文字列を記述できる任意の値を表します。以下はインターフェイスの宣言です。</p>
+<p>error 型はインタフェース型です。エラーの変数は、それ自体は文字列を記述できる任意の値を表します。以下はインターフェイスの宣言です。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="kt">error</span> <span class="kd">interface</span> <span class="p">{</span>
     <span class="nx">Error</span><span class="p">()</span> <span class="kt">string</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>エラー型は、すべての組み込み型と同様に、ユニバースブロックで事前に宣言されています。</p>
-<p>最も一般的に使用されるエラーの実装は、errors パッケージの非公開の errorString 型です。</p>
+<p>error 型は、すべての組み込み型と同様に、ユニバースブロックで事前に宣言されています。</p>
+<p>最も一般的に使用されるエラーの実装は、errors パッケージにある非公開の errorString 型です。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="c1">// errorString is a trivial implementation of error.</span>
 <span class="kd">type</span> <span class="nx">errorString</span> <span class="kd">struct</span> <span class="p">{</span>
     <span class="nx">s</span> <span class="kt">string</span>
