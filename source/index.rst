@@ -11,6 +11,7 @@ The Go Blog
     context
     slices
     slices_usage_and_internals
+    Error_handling_and_Go
 
 .. toctree::
     :maxdepth: 1
