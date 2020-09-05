@@ -1,0 +1,340 @@
+==============================================================
+JSON and Go
+==============================================================
+25 Jan 2011
+Tags: json, technical
+Summary: How to generate and consume JSON-formatted data in Go.
+OldURL: /json-and-go
+
+Andrew Gerrand
+
+----------
+
+はじめに(Introduction)
+===============================
+
+JSON (JavaScript Object Notation) は、シンプルなデータ交換フォーマットです。構文的には JavaScript のオブジェクトやリストに似ています。Webバックエンドとブラウザ上で動作するJavaScriptプログラム間の通信に最も一般的に使用されていますが、他の多くの場所でも使用されています。そのホームページである `json.org <http://json.org>`_ は、標準の定義を非常に明確かつ簡潔に提供しています。
+
+`json <https://golang.org/pkg/encoding/json/>`_ パッケージを使用すると、Go プログラムから簡単に JSON データを読み書きできます。
+
+エンコード(Encoding)
+===============================
+
+JSONデータをエンコードするために `Marshal <https://golang.org/pkg/encoding/json/#Marshal>`_ 関数が使用できます。
+
+.. code-block:: go
+
+	func Marshal(v interface{}) ([]byte, error)
+
+Goのデータ構造を ``Message`` とします。
+
+.. code-block:: go
+
+	type Message struct {
+	    Name string
+	    Body string
+	    Time int64
+	}
+
+そして ``Message`` のインスタンスを生成しましょう。
+
+.. code-block:: go
+
+	m := Message{"Alice", "Hello", 1294706395881547000}
+
+``json.Marshal`` を使用してJSONエンコードすることができます。
+
+.. code-block:: go
+
+	b, err := json.Marshal(m)
+
+問題がなければ ``err`` は ``nil`` になり、``b`` はこのJSONデータを含む ``[]byte`` になります。
+
+.. code-block:: go
+
+	b == []byte(`{"Name":"Alice","Body":"Hello","Time":1294706395881547000}`)
+
+有効なJSONとして表現できるデータ構造のみがエンコードされます。
+
+  - JSON オブジェクトはキーとして文字列のみをサポートしています。Goのmap型をエンコードするには、``map[string]T`` (``T`` は json パッケージでサポートされている任意の Go の型) の形式でなければなりません。
+
+  - チャネル型、複素数型、関数型はエンコードできません。
+
+  - 循環するデータ構造はサポートされていません。``Marshal`` が無限ループに陥る原因となります。
+
+  - ポインタは、そのポインタが指す値としてエンコードされます（ポインタが ``nil`` の場合は "null" となります）。
+
+json パッケージは struct 型の公開されたフィールド (大文字で始まるもの) にのみアクセスできます。そのため、構造体の公開されているフィールドのみがJSONの結果として現れます。
+
+デコード(Decoding)
+===============================
+
+JSONデータをデコードする場合、`Unmarshal <https://golang.org/pkg/encoding/json/#Unmarshal>`_ 関数を使います。
+
+.. code-block:: go
+
+	func Unmarshal(data []byte, v interface{}) error
+
+まず、復号化されたデータを格納する変数を生成する必要があります。
+
+.. code-block:: go
+
+	var m Message
+
+そして ``[]byte`` のJSONデータと ``m`` へのポインタを ``json.Unmarshal`` の引数として渡します。
+
+.. code-block:: go
+
+	err := json.Unmarshal(b, &m)
+
+``b`` が ``m`` に合致する有効な JSON が含まれていれば、呼び出し後の ``err`` は ``nil`` となり、``b`` のデータは、変数 ``m`` の構造体に格納されます。
+
+以下のようなものです。
+
+.. code-block:: go
+
+	m = Message{
+	    Name: "Alice",
+	    Body: "Hello",
+	    Time: 1294706395881547000,
+	}
+
+``Unmarshal`` は、デコードされたデータを格納するフィールドをどのように特定するのですか? 指定された JSON キー "Foo" に対して、``Unmarshal`` は格納先の構造体のフィールドを以下の優先順位の高い順に見つけます。
+
+  - "Foo" のタグを持つ公開されたフィールド（構造体のタグの詳細については `Go spec <https://golang.org/ref/spec#Struct_types>`_ を参照してください）。
+
+  - "Foo" という名前のエクスポートされたフィールド
+
+  - エクスポートされたフィールドの名前が "FOO" または "FOO" またはその他の大文字小文字を区別しない "Foo" にマッチするフィールド
+
+JSONデータの構造がGo型と完全に一致しない場合はどうなりますか？
+
+.. code-block:: go
+
+	b := []byte(`{"Name":"Bob","Food":"Pickle"}`)
+	var m Message
+	err := json.Unmarshal(b, &m)
+
+``Unmarshal`` は、格納先の型で見つけられるフィールドのみをデコードします。この場合、``m`` のNameフィールドのみがデコードされ、Foodフィールドは無視されます。この動作は、大きなJSON blobの中からいくつかの特定のフィールドだけを取り出したい場合に特に便利です。また、格納先の構造体内のエクスポートされていないフィールドは、``Unmarshal`` の影響を受けないことを意味します。
+
+しかし、事前にJSONデータの構造がわからない場合はどうすればいいのでしょうか？
+
+interface{} を使った汎用的なJSON(Generic JSON with interface{})
+======================================================================
+
+The `interface{}` (empty interface) type describes an interface with zero methods.
+Every Go type implements at least zero methods and therefore satisfies the empty interface.
+
+The empty interface serves as a general container type:
+
+.. code-block:: go
+
+	var i interface{}
+	i = "a string"
+	i = 2011
+	i = 2.777
+
+A type assertion accesses the underlying concrete type:
+
+.. code-block:: go
+
+	r := i.(float64)
+	fmt.Println("the circle's area", math.Pi*r*r)
+
+Or, if the underlying type is unknown, a type switch determines the type:
+
+.. code-block:: go
+
+	switch v := i.(type) {
+	case int:
+	    fmt.Println("twice i is", v*2)
+	case float64:
+	    fmt.Println("the reciprocal of i is", 1/v)
+	case string:
+	    h := len(v) / 2
+	    fmt.Println("i swapped by halves is", v[h:]+v[:h])
+	default:
+	    // i isn't one of the types above
+	}
+
+The json package uses `map[string]interface{}` and
+`[]interface{}` values to store arbitrary JSON objects and arrays;
+it will happily unmarshal any valid JSON blob into a plain
+`interface{}` value.  The default concrete Go types are:
+
+  - `bool` for JSON booleans,
+
+  - `float64` for JSON numbers,
+
+  - `string` for JSON strings, and
+
+  - `nil` for JSON null.
+
+任意のデータのデコード(Decoding arbitrary data)
+==============================================================
+
+Consider this JSON data, stored in the variable `b`:
+
+.. code-block:: go
+
+	b := []byte(`{"Name":"Wednesday","Age":6,"Parents":["Gomez","Morticia"]}`)
+
+Without knowing this data's structure, we can decode it into an `interface{}` value with `Unmarshal`:
+
+.. code-block:: go
+
+	var f interface{}
+	err := json.Unmarshal(b, &f)
+
+At this point the Go value in `f` would be a map whose keys are strings
+and whose values are themselves stored as empty interface values:
+
+.. code-block:: go
+
+	f = map[string]interface{}{
+	    "Name": "Wednesday",
+	    "Age":  6,
+	    "Parents": []interface{}{
+	        "Gomez",
+	        "Morticia",
+	    },
+	}
+
+To access this data we can use a type assertion to access `f`'s underlying `map[string]interface{}`:
+
+.. code-block:: go
+
+	m := f.(map[string]interface{})
+
+We can then iterate through the map with a range statement and use a type
+switch to access its values as their concrete types:
+
+.. code-block:: go
+
+	for k, v := range m {
+	    switch vv := v.(type) {
+	    case string:
+	        fmt.Println(k, "is string", vv)
+	    case float64:
+	        fmt.Println(k, "is float64", vv)
+	    case []interface{}:
+	        fmt.Println(k, "is an array:")
+	        for i, u := range vv {
+	            fmt.Println(i, u)
+	        }
+	    default:
+	        fmt.Println(k, "is of a type I don't know how to handle")
+	    }
+	}
+
+In this way you can work with unknown JSON data while still enjoying the benefits of type safety.
+
+参照型(Reference Types)
+===============================
+
+.. note::
+
+	``Reference Types`` というGoの型の呼び方は廃止されています。
+
+
+Let's define a Go type to contain the data from the previous example:
+
+.. code-block:: go
+
+	type FamilyMember struct {
+	    Name    string
+	    Age     int
+	    Parents []string
+	}
+
+	    var m FamilyMember
+	    err := json.Unmarshal(b, &m)
+
+Unmarshaling that data into a `FamilyMember` value works as expected,
+but if we look closely we can see a remarkable thing has happened.
+With the var statement we allocated a `FamilyMember` struct,
+and then provided a pointer to that value to `Unmarshal`,
+but at that time the `Parents` field was a `nil` slice value.
+To populate the `Parents` field, `Unmarshal` allocated a new slice behind the scenes.
+This is typical of how `Unmarshal` works with the supported reference types
+(pointers, slices, and maps).
+
+Consider unmarshaling into this data structure:
+
+.. code-block:: go
+
+	type Foo struct {
+	    Bar *Bar
+	}
+
+If there were a `Bar` field in the JSON object,
+`Unmarshal` would allocate a new `Bar` and populate it.
+If not, `Bar` would be left as a `nil` pointer.
+
+From this a useful pattern arises: if you have an application that receives
+a few distinct message types,
+you might define "receiver" structure like
+
+.. code-block:: go
+
+	type IncomingMessage struct {
+	    Cmd *Command
+	    Msg *Message
+	}
+
+and the sending party can populate the `Cmd` field and/or the `Msg` field
+of the top-level JSON object,
+depending on the type of message they want to communicate.
+`Unmarshal`, when decoding the JSON into an `IncomingMessage` struct,
+will only allocate the data structures present in the JSON data.
+To know which messages to process, the programmer need simply test that
+either `Cmd` or `Msg` is not `nil`.
+
+ストリーミングにおけるエンコードとデコード(Streaming Encoders and Decoders)
+==================================================================================
+
+json パッケージは、JSON データのストリーミングな読み書きにおける共通的な操作をサポートするための ``Decoder`` と ``Encoder`` 型を提供します。``NewDecoder`` と ``NewEncoder`` 関数は `io.Reader <https://golang.org/pkg/io/#Reader>`_ と `io.Writer <https://golang.org/pkg/io/#Writer>`_ のインターフェイス型をラップします。
+
+.. code-block:: go
+
+	func NewDecoder(r io.Reader) *Decoder
+	func NewEncoder(w io.Writer) *Encoder
+
+ここでは、標準入力から一連のJSONオブジェクトを読み込み、各オブジェクトからNameフィールドを除いたすべてのオブジェクトを削除し、標準出力に書き込むプログラムの例を示します。
+
+.. code-block:: go
+
+	package main
+
+	import (
+	    "encoding/json"
+	    "log"
+	    "os"
+	)
+
+	func main() {
+	    dec := json.NewDecoder(os.Stdin)
+	    enc := json.NewEncoder(os.Stdout)
+	    for {
+	        var v map[string]interface{}
+	        if err := dec.Decode(&v); err != nil {
+	            log.Println(err)
+	            return
+	        }
+	        for k := range v {
+	            if k != "Name" {
+	                delete(v, k)
+	            }
+	        }
+	        if err := enc.Encode(&v); err != nil {
+	            log.Println(err)
+	        }
+	    }
+	}
+
+ReadersとWritersが汎用的なインターフェースのため、``Encoder`` と ``Decoder`` の型は、HTTP のコネクション、WebSocket、またはファイルへの読み書きなど、幅広い場面で使用することができます。
+
+リファレンス
+==============================================================
+
+より詳しい情報は `json package documentation <https://golang.org/pkg/encoding/json/>`_ を確認ください。jsonの使用例については、`jsonrpc package <https://golang.org/pkg/net/rpc/jsonrpc/>`_ のソースファイルを参照してください。

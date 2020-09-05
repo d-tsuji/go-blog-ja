@@ -1,0 +1,382 @@
+
+<!DOCTYPE html>
+
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON and Go &#8212; Go database/sql tutorial  ドキュメント</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="検索" href="search.html" />
+    <link rel="next" title="TODO(内部用)" href="todo.html" />
+    <link rel="prev" title="}" href="Error_handling_and_Go.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <a href="https://github.com/d-tsuji/go-blog-ja"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a><div class="section" id="json-and-go">
+<h1>JSON and Go<a class="headerlink" href="#json-and-go" title="このヘッドラインへのパーマリンク">¶</a></h1>
+<p>25 Jan 2011
+Tags: json, technical
+Summary: How to generate and consume JSON-formatted data in Go.
+OldURL: /json-and-go</p>
+<p>Andrew Gerrand</p>
+<hr class="docutils" />
+<div class="section" id="introduction">
+<h2>はじめに(Introduction)<a class="headerlink" href="#introduction" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>JSON (JavaScript Object Notation) は、シンプルなデータ交換フォーマットです。構文的には JavaScript のオブジェクトやリストに似ています。Webバックエンドとブラウザ上で動作するJavaScriptプログラム間の通信に最も一般的に使用されていますが、他の多くの場所でも使用されています。そのホームページである <a class="reference external" href="http://json.org">json.org</a> は、標準の定義を非常に明確かつ簡潔に提供しています。</p>
+<p><a class="reference external" href="https://golang.org/pkg/encoding/json/">json</a> パッケージを使用すると、Go プログラムから簡単に JSON データを読み書きできます。</p>
+</div>
+<div class="section" id="encoding">
+<h2>エンコード(Encoding)<a class="headerlink" href="#encoding" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>JSONデータをエンコードするために <a class="reference external" href="https://golang.org/pkg/encoding/json/#Marshal">Marshal</a> 関数が使用できます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Marshal</span><span class="p">(</span><span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Goのデータ構造を <code class="docutils literal notranslate"><span class="pre">Message</span></code> とします。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">Message</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Name</span> <span class="kt">string</span>
+    <span class="nx">Body</span> <span class="kt">string</span>
+    <span class="nx">Time</span> <span class="kt">int64</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>そして <code class="docutils literal notranslate"><span class="pre">Message</span></code> のインスタンスを生成しましょう。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">m</span> <span class="o">:=</span> <span class="nx">Message</span><span class="p">{</span><span class="s">&quot;Alice&quot;</span><span class="p">,</span> <span class="s">&quot;Hello&quot;</span><span class="p">,</span> <span class="mi">1294706395881547000</span><span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">json.Marshal</span></code> を使用してJSONエンコードすることができます。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Marshal</span><span class="p">(</span><span class="nx">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>問題がなければ <code class="docutils literal notranslate"><span class="pre">err</span></code> は <code class="docutils literal notranslate"><span class="pre">nil</span></code> になり、<code class="docutils literal notranslate"><span class="pre">b</span></code> はこのJSONデータを含む <code class="docutils literal notranslate"><span class="pre">[]byte</span></code> になります。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span> <span class="o">==</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&quot;Name&quot;:&quot;Alice&quot;,&quot;Body&quot;:&quot;Hello&quot;,&quot;Time&quot;:1294706395881547000}`</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>有効なJSONとして表現できるデータ構造のみがエンコードされます。</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>JSON オブジェクトはキーとして文字列のみをサポートしています。Goのmap型をエンコードするには、<code class="docutils literal notranslate"><span class="pre">map[string]T</span></code> (<code class="docutils literal notranslate"><span class="pre">T</span></code> は json パッケージでサポートされている任意の Go の型) の形式でなければなりません。</p></li>
+<li><p>チャネル型、複素数型、関数型はエンコードできません。</p></li>
+<li><p>循環するデータ構造はサポートされていません。<code class="docutils literal notranslate"><span class="pre">Marshal</span></code> が無限ループに陥る原因となります。</p></li>
+<li><p>ポインタは、そのポインタが指す値としてエンコードされます（ポインタが <code class="docutils literal notranslate"><span class="pre">nil</span></code> の場合は &quot;null&quot; となります）。</p></li>
+</ul>
+</div></blockquote>
+<p>json パッケージは struct 型の公開されたフィールド (大文字で始まるもの) にのみアクセスできます。そのため、構造体の公開されているフィールドのみがJSONの結果として現れます。</p>
+</div>
+<div class="section" id="decoding">
+<h2>デコード(Decoding)<a class="headerlink" href="#decoding" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>JSONデータをデコードする場合、<a class="reference external" href="https://golang.org/pkg/encoding/json/#Unmarshal">Unmarshal</a> 関数を使います。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">data</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kt">error</span>
+</pre></div>
+</div>
+<p>まず、復号化されたデータを格納する変数を生成する必要があります。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">m</span> <span class="nx">Message</span>
+</pre></div>
+</div>
+<p>そして <code class="docutils literal notranslate"><span class="pre">[]byte</span></code> のJSONデータと <code class="docutils literal notranslate"><span class="pre">m</span></code> へのポインタを <code class="docutils literal notranslate"><span class="pre">json.Unmarshal</span></code> の引数として渡します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">b</span></code> が <code class="docutils literal notranslate"><span class="pre">m</span></code> に合致する有効な JSON が含まれていれば、呼び出し後の <code class="docutils literal notranslate"><span class="pre">err</span></code> は <code class="docutils literal notranslate"><span class="pre">nil</span></code> となり、<code class="docutils literal notranslate"><span class="pre">b</span></code> のデータは、変数 <code class="docutils literal notranslate"><span class="pre">m</span></code> の構造体に格納されます。</p>
+<p>以下のようなものです。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">m</span> <span class="p">=</span> <span class="nx">Message</span><span class="p">{</span>
+    <span class="nx">Name</span><span class="p">:</span> <span class="s">&quot;Alice&quot;</span><span class="p">,</span>
+    <span class="nx">Body</span><span class="p">:</span> <span class="s">&quot;Hello&quot;</span><span class="p">,</span>
+    <span class="nx">Time</span><span class="p">:</span> <span class="mi">1294706395881547000</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> は、デコードされたデータを格納するフィールドをどのように特定するのですか? 指定された JSON キー &quot;Foo&quot; に対して、<code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> は格納先の構造体のフィールドを以下の優先順位の高い順に見つけます。</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>&quot;Foo&quot; のタグを持つ公開されたフィールド（構造体のタグの詳細については <a class="reference external" href="https://golang.org/ref/spec#Struct_types">Go spec</a> を参照してください）。</p></li>
+<li><p>&quot;Foo&quot; という名前のエクスポートされたフィールド</p></li>
+<li><p>エクスポートされたフィールドの名前が &quot;FOO&quot; または &quot;FOO&quot; またはその他の大文字小文字を区別しない &quot;Foo&quot; にマッチするフィールド</p></li>
+</ul>
+</div></blockquote>
+<p>JSONデータの構造がGo型と完全に一致しない場合はどうなりますか？</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span> <span class="o">:=</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&quot;Name&quot;:&quot;Bob&quot;,&quot;Food&quot;:&quot;Pickle&quot;}`</span><span class="p">)</span>
+<span class="kd">var</span> <span class="nx">m</span> <span class="nx">Message</span>
+<span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> は、格納先の型で見つけられるフィールドのみをデコードします。この場合、<code class="docutils literal notranslate"><span class="pre">m</span></code> のNameフィールドのみがデコードされ、Foodフィールドは無視されます。この動作は、大きなJSON blobの中からいくつかの特定のフィールドだけを取り出したい場合に特に便利です。また、格納先の構造体内のエクスポートされていないフィールドは、<code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> の影響を受けないことを意味します。</p>
+<p>しかし、事前にJSONデータの構造がわからない場合はどうすればいいのでしょうか？</p>
+</div>
+<div class="section" id="interface-json-generic-json-with-interface">
+<h2>interface{} を使った汎用的なJSON(Generic JSON with interface{})<a class="headerlink" href="#interface-json-generic-json-with-interface" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>The <cite>interface{}</cite> (empty interface) type describes an interface with zero methods.
+Every Go type implements at least zero methods and therefore satisfies the empty interface.</p>
+<p>The empty interface serves as a general container type:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">i</span> <span class="kd">interface</span><span class="p">{}</span>
+<span class="nx">i</span> <span class="p">=</span> <span class="s">&quot;a string&quot;</span>
+<span class="nx">i</span> <span class="p">=</span> <span class="mi">2011</span>
+<span class="nx">i</span> <span class="p">=</span> <span class="mf">2.777</span>
+</pre></div>
+</div>
+<p>A type assertion accesses the underlying concrete type:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">r</span> <span class="o">:=</span> <span class="nx">i</span><span class="p">.(</span><span class="kt">float64</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;the circle&#39;s area&quot;</span><span class="p">,</span> <span class="nx">math</span><span class="p">.</span><span class="nx">Pi</span><span class="o">*</span><span class="nx">r</span><span class="o">*</span><span class="nx">r</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or, if the underlying type is unknown, a type switch determines the type:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">switch</span> <span class="nx">v</span> <span class="o">:=</span> <span class="nx">i</span><span class="p">.(</span><span class="kd">type</span><span class="p">)</span> <span class="p">{</span>
+<span class="k">case</span> <span class="kt">int</span><span class="p">:</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;twice i is&quot;</span><span class="p">,</span> <span class="nx">v</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span>
+<span class="k">case</span> <span class="kt">float64</span><span class="p">:</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;the reciprocal of i is&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="o">/</span><span class="nx">v</span><span class="p">)</span>
+<span class="k">case</span> <span class="kt">string</span><span class="p">:</span>
+    <span class="nx">h</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;i swapped by halves is&quot;</span><span class="p">,</span> <span class="nx">v</span><span class="p">[</span><span class="nx">h</span><span class="p">:]</span><span class="o">+</span><span class="nx">v</span><span class="p">[:</span><span class="nx">h</span><span class="p">])</span>
+<span class="k">default</span><span class="p">:</span>
+    <span class="c1">// i isn&#39;t one of the types above</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The json package uses <cite>map[string]interface{}</cite> and
+<cite>[]interface{}</cite> values to store arbitrary JSON objects and arrays;
+it will happily unmarshal any valid JSON blob into a plain
+<cite>interface{}</cite> value.  The default concrete Go types are:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><cite>bool</cite> for JSON booleans,</p></li>
+<li><p><cite>float64</cite> for JSON numbers,</p></li>
+<li><p><cite>string</cite> for JSON strings, and</p></li>
+<li><p><cite>nil</cite> for JSON null.</p></li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="decoding-arbitrary-data">
+<h2>任意のデータのデコード(Decoding arbitrary data)<a class="headerlink" href="#decoding-arbitrary-data" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>Consider this JSON data, stored in the variable <cite>b</cite>:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span> <span class="o">:=</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&quot;Name&quot;:&quot;Wednesday&quot;,&quot;Age&quot;:6,&quot;Parents&quot;:[&quot;Gomez&quot;,&quot;Morticia&quot;]}`</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Without knowing this data's structure, we can decode it into an <cite>interface{}</cite> value with <cite>Unmarshal</cite>:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">f</span> <span class="kd">interface</span><span class="p">{}</span>
+<span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">f</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>At this point the Go value in <cite>f</cite> would be a map whose keys are strings
+and whose values are themselves stored as empty interface values:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">f</span> <span class="p">=</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}{</span>
+    <span class="s">&quot;Name&quot;</span><span class="p">:</span> <span class="s">&quot;Wednesday&quot;</span><span class="p">,</span>
+    <span class="s">&quot;Age&quot;</span><span class="p">:</span>  <span class="mi">6</span><span class="p">,</span>
+    <span class="s">&quot;Parents&quot;</span><span class="p">:</span> <span class="p">[]</span><span class="kd">interface</span><span class="p">{}{</span>
+        <span class="s">&quot;Gomez&quot;</span><span class="p">,</span>
+        <span class="s">&quot;Morticia&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>To access this data we can use a type assertion to access <cite>f</cite>'s underlying <cite>map[string]interface{}</cite>:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">m</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.(</span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{})</span>
+</pre></div>
+</div>
+<p>We can then iterate through the map with a range statement and use a type
+switch to access its values as their concrete types:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">m</span> <span class="p">{</span>
+    <span class="k">switch</span> <span class="nx">vv</span> <span class="o">:=</span> <span class="nx">v</span><span class="p">.(</span><span class="kd">type</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">case</span> <span class="kt">string</span><span class="p">:</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="s">&quot;is string&quot;</span><span class="p">,</span> <span class="nx">vv</span><span class="p">)</span>
+    <span class="k">case</span> <span class="kt">float64</span><span class="p">:</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="s">&quot;is float64&quot;</span><span class="p">,</span> <span class="nx">vv</span><span class="p">)</span>
+    <span class="k">case</span> <span class="p">[]</span><span class="kd">interface</span><span class="p">{}:</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="s">&quot;is an array:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">u</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">vv</span> <span class="p">{</span>
+            <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">u</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="k">default</span><span class="p">:</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="s">&quot;is of a type I don&#39;t know how to handle&quot;</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>In this way you can work with unknown JSON data while still enjoying the benefits of type safety.</p>
+</div>
+<div class="section" id="reference-types">
+<h2>参照型(Reference Types)<a class="headerlink" href="#reference-types" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<div class="admonition note">
+<p class="admonition-title">注釈</p>
+<p><code class="docutils literal notranslate"><span class="pre">Reference</span> <span class="pre">Types</span></code> というGoの型の呼び方は廃止されています。</p>
+</div>
+<p>Let's define a Go type to contain the data from the previous example:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">FamilyMember</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Name</span>    <span class="kt">string</span>
+    <span class="nx">Age</span>     <span class="kt">int</span>
+    <span class="nx">Parents</span> <span class="p">[]</span><span class="kt">string</span>
+<span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nx">m</span> <span class="nx">FamilyMember</span>
+    <span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Unmarshaling that data into a <cite>FamilyMember</cite> value works as expected,
+but if we look closely we can see a remarkable thing has happened.
+With the var statement we allocated a <cite>FamilyMember</cite> struct,
+and then provided a pointer to that value to <cite>Unmarshal</cite>,
+but at that time the <cite>Parents</cite> field was a <cite>nil</cite> slice value.
+To populate the <cite>Parents</cite> field, <cite>Unmarshal</cite> allocated a new slice behind the scenes.
+This is typical of how <cite>Unmarshal</cite> works with the supported reference types
+(pointers, slices, and maps).</p>
+<p>Consider unmarshaling into this data structure:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">Foo</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Bar</span> <span class="o">*</span><span class="nx">Bar</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>If there were a <cite>Bar</cite> field in the JSON object,
+<cite>Unmarshal</cite> would allocate a new <cite>Bar</cite> and populate it.
+If not, <cite>Bar</cite> would be left as a <cite>nil</cite> pointer.</p>
+<p>From this a useful pattern arises: if you have an application that receives
+a few distinct message types,
+you might define &quot;receiver&quot; structure like</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">IncomingMessage</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Cmd</span> <span class="o">*</span><span class="nx">Command</span>
+    <span class="nx">Msg</span> <span class="o">*</span><span class="nx">Message</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>and the sending party can populate the <cite>Cmd</cite> field and/or the <cite>Msg</cite> field
+of the top-level JSON object,
+depending on the type of message they want to communicate.
+<cite>Unmarshal</cite>, when decoding the JSON into an <cite>IncomingMessage</cite> struct,
+will only allocate the data structures present in the JSON data.
+To know which messages to process, the programmer need simply test that
+either <cite>Cmd</cite> or <cite>Msg</cite> is not <cite>nil</cite>.</p>
+</div>
+<div class="section" id="streaming-encoders-and-decoders">
+<h2>ストリーミングにおけるエンコードとデコード(Streaming Encoders and Decoders)<a class="headerlink" href="#streaming-encoders-and-decoders" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>json パッケージは、JSON データのストリーミングな読み書きにおける共通的な操作をサポートするための <code class="docutils literal notranslate"><span class="pre">Decoder</span></code> と <code class="docutils literal notranslate"><span class="pre">Encoder</span></code> 型を提供します。<code class="docutils literal notranslate"><span class="pre">NewDecoder</span></code> と <code class="docutils literal notranslate"><span class="pre">NewEncoder</span></code> 関数は <a class="reference external" href="https://golang.org/pkg/io/#Reader">io.Reader</a> と <a class="reference external" href="https://golang.org/pkg/io/#Writer">io.Writer</a> のインターフェイス型をラップします。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">func</span> <span class="nx">NewDecoder</span><span class="p">(</span><span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="o">*</span><span class="nx">Decoder</span>
+<span class="kd">func</span> <span class="nx">NewEncoder</span><span class="p">(</span><span class="nx">w</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span><span class="p">)</span> <span class="o">*</span><span class="nx">Encoder</span>
+</pre></div>
+</div>
+<p>ここでは、標準入力から一連のJSONオブジェクトを読み込み、各オブジェクトからNameフィールドを除いたすべてのオブジェクトを削除し、標準出力に書き込むプログラムの例を示します。</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;encoding/json&quot;</span>
+    <span class="s">&quot;log&quot;</span>
+    <span class="s">&quot;os&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">dec</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">NewDecoder</span><span class="p">(</span><span class="nx">os</span><span class="p">.</span><span class="nx">Stdin</span><span class="p">)</span>
+    <span class="nx">enc</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">NewEncoder</span><span class="p">(</span><span class="nx">os</span><span class="p">.</span><span class="nx">Stdout</span><span class="p">)</span>
+    <span class="k">for</span> <span class="p">{</span>
+        <span class="kd">var</span> <span class="nx">v</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}</span>
+        <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">dec</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">v</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+            <span class="nx">log</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="nx">k</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">v</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="nx">k</span> <span class="o">!=</span> <span class="s">&quot;Name&quot;</span> <span class="p">{</span>
+                <span class="nb">delete</span><span class="p">(</span><span class="nx">v</span><span class="p">,</span> <span class="nx">k</span><span class="p">)</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">enc</span><span class="p">.</span><span class="nx">Encode</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">v</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+            <span class="nx">log</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>ReadersとWritersが汎用的なインターフェースのため、<code class="docutils literal notranslate"><span class="pre">Encoder</span></code> と <code class="docutils literal notranslate"><span class="pre">Decoder</span></code> の型は、HTTP のコネクション、WebSocket、またはファイルへの読み書きなど、幅広い場面で使用することができます。</p>
+</div>
+<div class="section" id="id1">
+<h2>リファレンス<a class="headerlink" href="#id1" title="このヘッドラインへのパーマリンク">¶</a></h2>
+<p>より詳しい情報は <a class="reference external" href="https://golang.org/pkg/encoding/json/">json package documentation</a> を確認ください。jsonの使用例については、<a class="reference external" href="https://golang.org/pkg/net/rpc/jsonrpc/">jsonrpc package</a> のソースファイルを参照してください。</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div id="toc" class="sidebarRow">
+    <h5><a href="index.html">The Go Blog</a></h5>
+    <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="context.html">Go Concurrency Patterns: Context</a></li>
+<li class="toctree-l1"><a class="reference internal" href="slices.html">Arrays, slices (and strings): The mechanics of 'append'</a></li>
+<li class="toctree-l1"><a class="reference internal" href="slices_usage_and_internals.html">Go Slices: usage and internals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id22">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id27">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id32">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id37">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id42">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id47">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id64">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id69">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id74">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id81">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id88">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id95">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id100">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id105">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id116">}</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Error_handling_and_Go.html#id125">}</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">JSON and Go</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="todo.html">TODO(内部用)</a></li>
+</ul>
+
+    
+</div>
+
+<style type="text/css">
+    .toctree-l1 {
+        font-size: 12px;
+        margin-bottom: 0;
+        font-stretch: normal;
+        font-style: normal;
+        line-height: 1.33;
+        padding-bottom: 5px;
+        margin: 2px;
+    }
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;VividCortex (translated by @d-tsuji).
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/json.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
