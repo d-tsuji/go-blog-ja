@@ -126,21 +126,20 @@ OldURL: /json-and-go</p>
 </div>
 <div class="section" id="interface-json-generic-json-with-interface">
 <h2>interface{} を使った汎用的なJSON(Generic JSON with interface{})<a class="headerlink" href="#interface-json-generic-json-with-interface" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>The <cite>interface{}</cite> (empty interface) type describes an interface with zero methods.
-Every Go type implements at least zero methods and therefore satisfies the empty interface.</p>
-<p>The empty interface serves as a general container type:</p>
+<p><code class="docutils literal notranslate"><span class="pre">interface{}</span></code> は (空のインターフェイス)型は、メソッドを持たないインターフェースの型として表現されます。すべての Go の型は少なくとも 0 つのメソッドを実装しており、したがって空のインターフェイスを満たしています。</p>
+<p>空のインターフェイスは、汎用的な値を格納するコンテナとして機能します。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">i</span> <span class="kd">interface</span><span class="p">{}</span>
 <span class="nx">i</span> <span class="p">=</span> <span class="s">&quot;a string&quot;</span>
 <span class="nx">i</span> <span class="p">=</span> <span class="mi">2011</span>
 <span class="nx">i</span> <span class="p">=</span> <span class="mf">2.777</span>
 </pre></div>
 </div>
-<p>A type assertion accesses the underlying concrete type:</p>
+<p>型アサーションして、<code class="docutils literal notranslate"><span class="pre">interface{}</span></code> 型の具象型にアクセスします。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">r</span> <span class="o">:=</span> <span class="nx">i</span><span class="p">.(</span><span class="kt">float64</span><span class="p">)</span>
 <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;the circle&#39;s area&quot;</span><span class="p">,</span> <span class="nx">math</span><span class="p">.</span><span class="nx">Pi</span><span class="o">*</span><span class="nx">r</span><span class="o">*</span><span class="nx">r</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Or, if the underlying type is unknown, a type switch determines the type:</p>
+<p>あるいは、実際の型が不明な場合は、型スイッチによって型を特定できます。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">switch</span> <span class="nx">v</span> <span class="o">:=</span> <span class="nx">i</span><span class="p">.(</span><span class="kd">type</span><span class="p">)</span> <span class="p">{</span>
 <span class="k">case</span> <span class="kt">int</span><span class="p">:</span>
     <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;twice i is&quot;</span><span class="p">,</span> <span class="nx">v</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span>
@@ -154,32 +153,28 @@ Every Go type implements at least zero methods and therefore satisfies the empty
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>The json package uses <cite>map[string]interface{}</cite> and
-<cite>[]interface{}</cite> values to store arbitrary JSON objects and arrays;
-it will happily unmarshal any valid JSON blob into a plain
-<cite>interface{}</cite> value.  The default concrete Go types are:</p>
+<p>jsonパッケージは、任意のJSONオブジェクトや配列を格納するために <code class="docutils literal notranslate"><span class="pre">map[string]interface{}</span></code> や <code class="docutils literal notranslate"><span class="pre">[]interface{}</span></code> 値を使用します。デフォルトの具体的なGoの型は以下の通りです。</p>
 <blockquote>
 <div><ul class="simple">
-<li><p><cite>bool</cite> for JSON booleans,</p></li>
-<li><p><cite>float64</cite> for JSON numbers,</p></li>
-<li><p><cite>string</cite> for JSON strings, and</p></li>
-<li><p><cite>nil</cite> for JSON null.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bool</span></code> は JSON の booleans</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">float64</span></code> は JSON の numbers</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">string</span></code> は JSON の strings</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nil</span></code> null のJSON</p></li>
 </ul>
 </div></blockquote>
 </div>
 <div class="section" id="decoding-arbitrary-data">
 <h2>任意のデータのデコード(Decoding arbitrary data)<a class="headerlink" href="#decoding-arbitrary-data" title="このヘッドラインへのパーマリンク">¶</a></h2>
-<p>Consider this JSON data, stored in the variable <cite>b</cite>:</p>
+<p>変数 <code class="docutils literal notranslate"><span class="pre">b</span></code> に格納されているこのJSONデータを考えてみましょう。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">b</span> <span class="o">:=</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&quot;Name&quot;:&quot;Wednesday&quot;,&quot;Age&quot;:6,&quot;Parents&quot;:[&quot;Gomez&quot;,&quot;Morticia&quot;]}`</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Without knowing this data's structure, we can decode it into an <cite>interface{}</cite> value with <cite>Unmarshal</cite>:</p>
+<p>このデータの構造を知らなくても、<code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> を使って <code class="docutils literal notranslate"><span class="pre">interface{}</span></code> 型の値にデコードすることができます。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">f</span> <span class="kd">interface</span><span class="p">{}</span>
 <span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">f</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>At this point the Go value in <cite>f</cite> would be a map whose keys are strings
-and whose values are themselves stored as empty interface values:</p>
+<p>この時点で <code class="docutils literal notranslate"><span class="pre">f</span></code> の Go 値は、キーが文字列で、その値自体が空のインターフェイス値として格納されている map になります。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">f</span> <span class="p">=</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}{</span>
     <span class="s">&quot;Name&quot;</span><span class="p">:</span> <span class="s">&quot;Wednesday&quot;</span><span class="p">,</span>
     <span class="s">&quot;Age&quot;</span><span class="p">:</span>  <span class="mi">6</span><span class="p">,</span>
@@ -190,12 +185,13 @@ and whose values are themselves stored as empty interface values:</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>To access this data we can use a type assertion to access <cite>f</cite>'s underlying <cite>map[string]interface{}</cite>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">f</span></code> の実際の型である <code class="docutils literal notranslate"><span class="pre">map[string]interface{}</span></code> 型に型アサーションして、データにアクセスします。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="nx">m</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.(</span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{})</span>
 </pre></div>
 </div>
 <p>We can then iterate through the map with a range statement and use a type
-switch to access its values as their concrete types:</p>
+switch to access its values as their concrete types:
+次に、range 文を使用して map を反復処理し、型スイッチを使用して具象型にアクセスすることができます。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">m</span> <span class="p">{</span>
     <span class="k">switch</span> <span class="nx">vv</span> <span class="o">:=</span> <span class="nx">v</span><span class="p">.(</span><span class="kd">type</span><span class="p">)</span> <span class="p">{</span>
     <span class="k">case</span> <span class="kt">string</span><span class="p">:</span>
@@ -213,7 +209,7 @@ switch to access its values as their concrete types:</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>In this way you can work with unknown JSON data while still enjoying the benefits of type safety.</p>
+<p>このようにして、未知のJSONデータを扱うことができます。型の安全性の利点を享受することができます。</p>
 </div>
 <div class="section" id="reference-types">
 <h2>参照型(Reference Types)<a class="headerlink" href="#reference-types" title="このヘッドラインへのパーマリンク">¶</a></h2>
@@ -221,50 +217,33 @@ switch to access its values as their concrete types:</p>
 <p class="admonition-title">注釈</p>
 <p><code class="docutils literal notranslate"><span class="pre">Reference</span> <span class="pre">Types</span></code> というGoの型の呼び方は廃止されています。</p>
 </div>
-<p>Let's define a Go type to contain the data from the previous example:</p>
+<p>先ほどの例のデータを格納するGo型を定義してみましょう。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">FamilyMember</span> <span class="kd">struct</span> <span class="p">{</span>
     <span class="nx">Name</span>    <span class="kt">string</span>
     <span class="nx">Age</span>     <span class="kt">int</span>
     <span class="nx">Parents</span> <span class="p">[]</span><span class="kt">string</span>
 <span class="p">}</span>
 
-    <span class="kd">var</span> <span class="nx">m</span> <span class="nx">FamilyMember</span>
-    <span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">m</span><span class="p">)</span>
+<span class="kd">var</span> <span class="nx">m</span> <span class="nx">FamilyMember</span>
+<span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshal</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">m</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Unmarshaling that data into a <cite>FamilyMember</cite> value works as expected,
-but if we look closely we can see a remarkable thing has happened.
-With the var statement we allocated a <cite>FamilyMember</cite> struct,
-and then provided a pointer to that value to <cite>Unmarshal</cite>,
-but at that time the <cite>Parents</cite> field was a <cite>nil</cite> slice value.
-To populate the <cite>Parents</cite> field, <cite>Unmarshal</cite> allocated a new slice behind the scenes.
-This is typical of how <cite>Unmarshal</cite> works with the supported reference types
-(pointers, slices, and maps).</p>
-<p>Consider unmarshaling into this data structure:</p>
+<p>そのデータを <code class="docutils literal notranslate"><span class="pre">FamilyMember</span></code> の値にアンマーシャルすると期待通りに動作しますが、よく見ると驚くべきことが起きていることがわかります。var ステートメントで <code class="docutils literal notranslate"><span class="pre">FamilyMember</span></code> 構造体を割り当て、その値へのポインタを <code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> に提供しましたが、その時点では <code class="docutils literal notranslate"><span class="pre">Parents</span></code> フィールドは <code class="docutils literal notranslate"><span class="pre">nil</span></code> のスライス値でした。<code class="docutils literal notranslate"><span class="pre">Parents</span></code> フィールドを入力するために、<code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> は裏で新しいスライスを割り当てました。これは、サポートされている参照型(ポインタ、スライス、およびマップ)で <code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> がどのように動作するかの典型的な例です。</p>
+<p>このデータ構造へのアンマーシャリングを考えてみます。</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">Foo</span> <span class="kd">struct</span> <span class="p">{</span>
     <span class="nx">Bar</span> <span class="o">*</span><span class="nx">Bar</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>If there were a <cite>Bar</cite> field in the JSON object,
-<cite>Unmarshal</cite> would allocate a new <cite>Bar</cite> and populate it.
-If not, <cite>Bar</cite> would be left as a <cite>nil</cite> pointer.</p>
-<p>From this a useful pattern arises: if you have an application that receives
-a few distinct message types,
-you might define &quot;receiver&quot; structure like</p>
+<p>JSON オブジェクトに <code class="docutils literal notranslate"><span class="pre">Bar</span></code> フィールドがあれば、<code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> は新しい <code class="docutils literal notranslate"><span class="pre">Bar</span></code> を割り当て、それを埋めます。そうでない場合は、<code class="docutils literal notranslate"><span class="pre">Bar</span></code> は <code class="docutils literal notranslate"><span class="pre">nil</span></code> ポインタとして残されます。</p>
+<p>このことから便利なパターンが生まれます: いくつかの異なるメッセージタイプを受信するアプリケーションがある場合、&quot;レシーバ&quot; 構造体を以下のように</p>
 <div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="kd">type</span> <span class="nx">IncomingMessage</span> <span class="kd">struct</span> <span class="p">{</span>
     <span class="nx">Cmd</span> <span class="o">*</span><span class="nx">Command</span>
     <span class="nx">Msg</span> <span class="o">*</span><span class="nx">Message</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>and the sending party can populate the <cite>Cmd</cite> field and/or the <cite>Msg</cite> field
-of the top-level JSON object,
-depending on the type of message they want to communicate.
-<cite>Unmarshal</cite>, when decoding the JSON into an <cite>IncomingMessage</cite> struct,
-will only allocate the data structures present in the JSON data.
-To know which messages to process, the programmer need simply test that
-either <cite>Cmd</cite> or <cite>Msg</cite> is not <cite>nil</cite>.</p>
+<p>と送信側は、通信したいメッセージの型に応じて、トップレベル JSON オブジェクトの <code class="docutils literal notranslate"><span class="pre">Cmd</span></code> フィールドおよび/または <code class="docutils literal notranslate"><span class="pre">Msg</span></code> フィールドを入力することができます。<code class="docutils literal notranslate"><span class="pre">Unmarshal</span></code> は、JSONを <code class="docutils literal notranslate"><span class="pre">IncomingMessage</span></code> 構造体にデコードする際に、JSONデータに存在するデータ構造体のみを割り当てます。どのメッセージを処理するかを知るために、プログラマーは <code class="docutils literal notranslate"><span class="pre">Cmd</span></code> と <code class="docutils literal notranslate"><span class="pre">Msg</span></code> のどちらかが <code class="docutils literal notranslate"><span class="pre">nil</span></code> ではないことをテストするだけでよいのです。</p>
 </div>
 <div class="section" id="streaming-encoders-and-decoders">
 <h2>ストリーミングにおけるエンコードとデコード(Streaming Encoders and Decoders)<a class="headerlink" href="#streaming-encoders-and-decoders" title="このヘッドラインへのパーマリンク">¶</a></h2>

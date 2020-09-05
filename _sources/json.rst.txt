@@ -122,10 +122,9 @@ JSONデータの構造がGo型と完全に一致しない場合はどうなり�
 interface{} を使った汎用的なJSON(Generic JSON with interface{})
 ======================================================================
 
-The `interface{}` (empty interface) type describes an interface with zero methods.
-Every Go type implements at least zero methods and therefore satisfies the empty interface.
+``interface{}`` は (空のインターフェイス)型は、メソッドを持たないインターフェースの型として表現されます。すべての Go の型は少なくとも 0 つのメソッドを実装しており、したがって空のインターフェイスを満たしています。
 
-The empty interface serves as a general container type:
+空のインターフェイスは、汎用的な値を格納するコンテナとして機能します。
 
 .. code-block:: go
 
@@ -134,14 +133,14 @@ The empty interface serves as a general container type:
 	i = 2011
 	i = 2.777
 
-A type assertion accesses the underlying concrete type:
+型アサーションして、``interface{}`` 型の具象型にアクセスします。
 
 .. code-block:: go
 
 	r := i.(float64)
 	fmt.Println("the circle's area", math.Pi*r*r)
 
-Or, if the underlying type is unknown, a type switch determines the type:
+あるいは、実際の型が不明な場合は、型スイッチによって型を特定できます。
 
 .. code-block:: go
 
@@ -157,37 +156,33 @@ Or, if the underlying type is unknown, a type switch determines the type:
 	    // i isn't one of the types above
 	}
 
-The json package uses `map[string]interface{}` and
-`[]interface{}` values to store arbitrary JSON objects and arrays;
-it will happily unmarshal any valid JSON blob into a plain
-`interface{}` value.  The default concrete Go types are:
+jsonパッケージは、任意のJSONオブジェクトや配列を格納するために ``map[string]interface{}`` や ``[]interface{}`` 値を使用します。デフォルトの具体的なGoの型は以下の通りです。
 
-  - `bool` for JSON booleans,
+  - ``bool`` は JSON の booleans
 
-  - `float64` for JSON numbers,
+  - ``float64`` は JSON の numbers
 
-  - `string` for JSON strings, and
+  - ``string`` は JSON の strings
 
-  - `nil` for JSON null.
+  - ``nil`` null のJSON
 
 任意のデータのデコード(Decoding arbitrary data)
 ==============================================================
 
-Consider this JSON data, stored in the variable `b`:
+変数 ``b`` に格納されているこのJSONデータを考えてみましょう。
 
 .. code-block:: go
 
 	b := []byte(`{"Name":"Wednesday","Age":6,"Parents":["Gomez","Morticia"]}`)
 
-Without knowing this data's structure, we can decode it into an `interface{}` value with `Unmarshal`:
+このデータの構造を知らなくても、``Unmarshal`` を使って ``interface{}`` 型の値にデコードすることができます。
 
 .. code-block:: go
 
 	var f interface{}
 	err := json.Unmarshal(b, &f)
 
-At this point the Go value in `f` would be a map whose keys are strings
-and whose values are themselves stored as empty interface values:
+この時点で ``f`` の Go 値は、キーが文字列で、その値自体が空のインターフェイス値として格納されている map になります。
 
 .. code-block:: go
 
@@ -200,7 +195,7 @@ and whose values are themselves stored as empty interface values:
 	    },
 	}
 
-To access this data we can use a type assertion to access `f`'s underlying `map[string]interface{}`:
+``f`` の実際の型である ``map[string]interface{}`` 型に型アサーションして、データにアクセスします。
 
 .. code-block:: go
 
@@ -208,6 +203,7 @@ To access this data we can use a type assertion to access `f`'s underlying `map[
 
 We can then iterate through the map with a range statement and use a type
 switch to access its values as their concrete types:
+次に、range 文を使用して map を反復処理し、型スイッチを使用して具象型にアクセスすることができます。
 
 .. code-block:: go
 
@@ -227,7 +223,7 @@ switch to access its values as their concrete types:
 	    }
 	}
 
-In this way you can work with unknown JSON data while still enjoying the benefits of type safety.
+このようにして、未知のJSONデータを扱うことができます。型の安全性の利点を享受することができます。
 
 参照型(Reference Types)
 ===============================
@@ -236,8 +232,7 @@ In this way you can work with unknown JSON data while still enjoying the benefit
 
 	``Reference Types`` というGoの型の呼び方は廃止されています。
 
-
-Let's define a Go type to contain the data from the previous example:
+先ほどの例のデータを格納するGo型を定義してみましょう。
 
 .. code-block:: go
 
@@ -247,19 +242,12 @@ Let's define a Go type to contain the data from the previous example:
 	    Parents []string
 	}
 
-	    var m FamilyMember
-	    err := json.Unmarshal(b, &m)
+	var m FamilyMember
+	err := json.Unmarshal(b, &m)
 
-Unmarshaling that data into a `FamilyMember` value works as expected,
-but if we look closely we can see a remarkable thing has happened.
-With the var statement we allocated a `FamilyMember` struct,
-and then provided a pointer to that value to `Unmarshal`,
-but at that time the `Parents` field was a `nil` slice value.
-To populate the `Parents` field, `Unmarshal` allocated a new slice behind the scenes.
-This is typical of how `Unmarshal` works with the supported reference types
-(pointers, slices, and maps).
+そのデータを ``FamilyMember`` の値にアンマーシャルすると期待通りに動作しますが、よく見ると驚くべきことが起きていることがわかります。var ステートメントで ``FamilyMember`` 構造体を割り当て、その値へのポインタを ``Unmarshal`` に提供しましたが、その時点では ``Parents`` フィールドは ``nil`` のスライス値でした。``Parents`` フィールドを入力するために、``Unmarshal`` は裏で新しいスライスを割り当てました。これは、サポートされている参照型(ポインタ、スライス、およびマップ)で ``Unmarshal`` がどのように動作するかの典型的な例です。
 
-Consider unmarshaling into this data structure:
+このデータ構造へのアンマーシャリングを考えてみます。
 
 .. code-block:: go
 
@@ -267,13 +255,9 @@ Consider unmarshaling into this data structure:
 	    Bar *Bar
 	}
 
-If there were a `Bar` field in the JSON object,
-`Unmarshal` would allocate a new `Bar` and populate it.
-If not, `Bar` would be left as a `nil` pointer.
+JSON オブジェクトに ``Bar`` フィールドがあれば、``Unmarshal`` は新しい ``Bar`` を割り当て、それを埋めます。そうでない場合は、``Bar`` は ``nil`` ポインタとして残されます。
 
-From this a useful pattern arises: if you have an application that receives
-a few distinct message types,
-you might define "receiver" structure like
+このことから便利なパターンが生まれます: いくつかの異なるメッセージタイプを受信するアプリケーションがある場合、"レシーバ" 構造体を以下のように
 
 .. code-block:: go
 
@@ -282,13 +266,7 @@ you might define "receiver" structure like
 	    Msg *Message
 	}
 
-and the sending party can populate the `Cmd` field and/or the `Msg` field
-of the top-level JSON object,
-depending on the type of message they want to communicate.
-`Unmarshal`, when decoding the JSON into an `IncomingMessage` struct,
-will only allocate the data structures present in the JSON data.
-To know which messages to process, the programmer need simply test that
-either `Cmd` or `Msg` is not `nil`.
+と送信側は、通信したいメッセージの型に応じて、トップレベル JSON オブジェクトの ``Cmd`` フィールドおよび/または ``Msg`` フィールドを入力することができます。``Unmarshal`` は、JSONを ``IncomingMessage`` 構造体にデコードする際に、JSONデータに存在するデータ構造体のみを割り当てます。どのメッセージを処理するかを知るために、プログラマーは ``Cmd`` と ``Msg`` のどちらかが ``nil`` ではないことをテストするだけでよいのです。
 
 ストリーミングにおけるエンコードとデコード(Streaming Encoders and Decoders)
 ==================================================================================
